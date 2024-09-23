@@ -4,8 +4,10 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/widget"
+	"io"
 )
 
 type EditorApp struct {
@@ -36,11 +38,36 @@ func main() {
 	w := a.NewWindow("Go Editor")
 	// var editor EditorApp
 
+	fileContent := widget.NewMultiLineEntry()
+
+	openFileDialog := func() {
+		dialog.NewFileOpen(func(reader fyne.URIReadCloser, err error) {
+			if err != nil {
+				dialog.ShowError(err, w)
+				return
+			}
+			if reader == nil {
+				// user quit
+				return
+			}
+
+			data, err := io.ReadAll(reader)
+			if err != nil {
+				dialog.ShowError(err, w)
+				return
+			}
+
+			fileContent.SetText(string(data))
+			w.SetContent(fileContent)
+		}, w).Show()
+	}
+
 	// shouldn't I put this into a separate go routine?
 	ctrlO := &desktop.CustomShortcut{KeyName: fyne.KeyO, Modifier: fyne.KeyModifierControl}
 	w.Canvas().AddShortcut(ctrlO, func(shortcut fyne.Shortcut) {
 		// I should definitely put this into a go routing, at least the file open
 		// open dialog
+		openFileDialog()
 		// get file path
 		// read file, if that succeeds:
 		// create a tab -> add it to EditorApp
