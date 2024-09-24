@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"golang.org/x/term"
 	"os"
+	"unicode"
 )
 
 var terminalState *term.State
@@ -33,6 +34,11 @@ func main() {
 		os.Stdin.Read(b)
 		if b[0] == 'q' {
 			die("q was clicked")
+		}
+		if unicode.IsControl(rune(b[0])) {
+			fmt.Printf("%d\n", b[0])
+		} else {
+			fmt.Printf("%d, ('%c')\n", b[0], b[0])
 		}
 	}
 }
