@@ -13,7 +13,12 @@ func CONTROL_KEY(key byte) int {
 
 /*** data ***/
 
+type EditorConfig struct {
+	screenrows, screencols int
+}
+
 var terminalState *term.State
+var editorConfig = EditorConfig{}
 
 /*** terminal ***/
 
@@ -62,7 +67,7 @@ func editorProcessKeyPress() {
 /*** output ***/
 
 func editorDrawRows() {
-	for i := 0; i < 24; i++ {
+	for i := 0; i < editorConfig.screenrows; i++ {
 		os.Stdout.Write([]byte("~\r\n"))
 	}
 }
@@ -78,9 +83,21 @@ func editorRefreshScreen() {
 
 /*** init ***/
 
+func initEditor() {
+	// get window size
+	width, height, err := term.GetSize(int(os.Stdout.Fd()))
+	if err != nil {
+		die(err.Error() + " init")
+	}
+
+	editorConfig.screenrows = height
+	editorConfig.screencols = width
+}
+
 func main() {
 	enableRawMode()
 
+	initEditor()
 	for {
 		editorRefreshScreen()
 		editorProcessKeyPress()
