@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"golang.org/x/term"
 	"os"
-	// "unicode"
 )
 
 var GODITOR_VERSION = "0.0.1"
@@ -16,9 +15,16 @@ func CONTROL_KEY(key byte) int {
 
 /*** data ***/
 
+type erow struct {
+	size  int
+	chars []byte
+}
+
 type EditorConfig struct {
 	cursor_x, cursor_y     int
 	screenrows, screencols int
+	numrows                int
+	rows                   []erow
 }
 
 var terminalState *term.State
@@ -30,6 +36,11 @@ const (
 	ARROW_RIGHT
 	ARROW_UP
 	ARROW_DOWN
+	DEL_KEY
+	HOME_KEY
+	END_KEY
+	PAGE_UP
+	PAGE_DOWN
 )
 
 /*** terminal ***/
@@ -54,15 +65,47 @@ func editorReadKey() int {
 
 	if b[0] == '\x1b' {
 		if b[1] == '[' {
+			if b[2] >= '0' && b[2] <= '9' {
+				if b[3] == '~' {
+					switch b[2] {
+					case '1':
+						return HOME_KEY
+					case '3':
+						return DEL_KEY
+					case '4':
+						return END_KEY
+					case '5':
+						return PAGE_UP
+					case '6':
+						return PAGE_DOWN
+					case '7':
+						return HOME_KEY
+					case '8':
+						return END_KEY
+					}
+				}
+			} else {
+				switch b[2] {
+				case 'A':
+					return ARROW_UP
+				case 'B':
+					return ARROW_DOWN
+				case 'C':
+					return ARROW_RIGHT
+				case 'D':
+					return ARROW_LEFT
+				case 'H':
+					return HOME_KEY
+				case 'F':
+					return END_KEY
+				}
+			}
+		} else if b[1] == 'O' {
 			switch b[2] {
-			case 'A':
-				return ARROW_UP
-			case 'B':
-				return ARROW_DOWN
-			case 'C':
-				return ARROW_RIGHT
-			case 'D':
-				return ARROW_LEFT
+			case 'H':
+				return HOME_KEY
+			case 'F':
+				return END_KEY
 			}
 		}
 
@@ -70,28 +113,6 @@ func editorReadKey() int {
 	} else {
 		return int(b[0])
 	}
-
-	// switch c {
-	// case 1:
-	// 	return int(b[0])
-	// case 2:
-	// 	return '\x1b'
-	// case 3, 4:
-	// 	if b[0] == '\x1b' {
-	// 		if b[1] == '[' {
-	// 			switch b[2] {
-	// 			case 'A':
-	// 				return ARROW_UP
-	// 			case 'B':
-	// 				return ARROW_LEFT
-	// 			case 'C':
-	// 				return ARROW_RIGHT
-	// 			case 'D':
-	// 				return ARROW_DOWN
-	// 			}
-	// 		}
-	// 	}
-	// }
 }
 
 func die(str string) {
@@ -116,6 +137,18 @@ func editorProcessKeyPress() {
 		os.Exit(0)
 	case ARROW_DOWN, ARROW_LEFT, ARROW_RIGHT, ARROW_UP:
 		editorMoveCursor(ch)
+	case HOME_KEY:
+		editorConfig.cursor_x = 0
+	case END_KEY:
+		editorConfig.cursor_x = editorConfig.screencols - 1
+	case PAGE_DOWN, PAGE_UP:
+		for times := editorConfig.screenrows; times > 0; times-- {
+			if ch == PAGE_UP {
+				editorMoveCursor(ARROW_UP)
+			} else {
+				editorMoveCursor(ARROW_DOWN)
+			}
+		}
 	}
 }
 
@@ -200,6 +233,7 @@ func initEditor() {
 	editorConfig.screencols = width
 	editorConfig.cursor_x = 0
 	editorConfig.cursor_y = 0
+	editorConfig.numrows = 0
 }
 
 func main() {
