@@ -124,6 +124,25 @@ func die(str string) {
 	os.Exit(1)
 }
 
+/*** file ***/
+
+func editorOpen() {
+	line := []byte("Hello world")
+	line2 := []byte("Hello world, this is me and I'm trying this new functionality, it's cool")
+
+	r := erow{
+		size:  len(line),
+		chars: line,
+	}
+	r2 := erow{
+		size:  len(line2),
+		chars: line2,
+	}
+
+	editorConfig.rows = append(editorConfig.rows, r, r2)
+	editorConfig.numrows = 2
+}
+
 /*** input ***/
 
 func editorProcessKeyPress() {
@@ -177,20 +196,26 @@ func editorMoveCursor(key int) {
 
 func editorDrawRows() {
 	for i := 0; i < editorConfig.screenrows; i++ {
-		if i == editorConfig.screenrows/3 {
-			welcome := fmt.Sprintf("Goditor editor -- version: %s", GODITOR_VERSION)
+		if i >= editorConfig.numrows {
+			if i == editorConfig.screenrows/3 {
+				welcome := fmt.Sprintf("Goditor editor -- version: %s", GODITOR_VERSION)
 
-			padding := (editorConfig.screencols - len(welcome)) / 2
-			if padding > 0 {
+				padding := (editorConfig.screencols - len(welcome)) / 2
+				if padding > 0 {
+					byteBuffer.WriteString("~")
+				}
+				for ; padding > 0; padding-- {
+					byteBuffer.WriteString(" ")
+				}
+
+				byteBuffer.WriteString(welcome)
+			} else {
 				byteBuffer.WriteString("~")
 			}
-			for ; padding > 0; padding-- {
-				byteBuffer.WriteString(" ")
-			}
-
-			byteBuffer.WriteString(welcome)
 		} else {
-			byteBuffer.WriteString("~")
+			for _, c := range editorConfig.rows[i].chars {
+				byteBuffer.WriteByte(c)
+			}
 		}
 
 		byteBuffer.WriteString("\x1b[K") // clear reset of the line
@@ -240,6 +265,7 @@ func main() {
 	enableRawMode()
 
 	initEditor()
+	editorOpen()
 	for {
 		editorRefreshScreen()
 		editorProcessKeyPress()
