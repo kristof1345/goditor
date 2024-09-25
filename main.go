@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"golang.org/x/term"
 	"os"
@@ -18,6 +19,7 @@ type EditorConfig struct {
 }
 
 var terminalState *term.State
+var byteBuffer = bytes.Buffer{}
 var editorConfig = EditorConfig{}
 
 /*** terminal ***/
@@ -58,6 +60,7 @@ func editorProcessKeyPress() {
 	switch ch {
 	case byte(CONTROL_KEY('q')):
 		os.Stdout.Write([]byte("\x1b[2J"))
+		os.Stdout.Write([]byte("\x1b[3J"))
 		os.Stdout.Write([]byte("\x1b[H"))
 		term.Restore(int(os.Stdout.Fd()), terminalState)
 		os.Exit(0)
@@ -68,17 +71,26 @@ func editorProcessKeyPress() {
 
 func editorDrawRows() {
 	for i := 0; i < editorConfig.screenrows; i++ {
-		os.Stdout.Write([]byte("~\r\n"))
+		byteBuffer.WriteString("~")
+		if i < editorConfig.screenrows-1 {
+			byteBuffer.WriteString("\r\n")
+		}
 	}
 }
 
 func editorRefreshScreen() {
-	os.Stdout.Write([]byte("\x1b[2J"))
-	os.Stdout.Write([]byte("\x1b[H"))
+	byteBuffer.WriteString("\x1b[2J")
+	byteBuffer.WriteString("\x1b[3J")
+	byteBuffer.WriteString("\x1b[H")
+	// os.Stdout.Write([]byte("\x1b[2J"))
+	// os.Stdout.Write([]byte("\x1b[H"))
 
 	editorDrawRows()
 
-	os.Stdout.Write([]byte("\x1b[H"))
+	byteBuffer.WriteString("\x1b[H")
+	// os.Stdout.Write([]byte("\x1b[H"))
+
+	os.Stdout.Write(byteBuffer.Bytes())
 }
 
 /*** init ***/
