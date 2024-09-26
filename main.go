@@ -126,6 +126,19 @@ func die(str string) {
 	os.Exit(1)
 }
 
+/*** row operations ***/
+
+func editorAppendRow(line []byte) {
+	r := erow{
+		size:  len(line),
+		chars: line,
+	}
+
+	editorConfig.rows = append(editorConfig.rows, r)
+	// E.row[at].chars[len] = '\0' - make note of this - we might need it, I dunno what it does
+	editorConfig.numrows += 1
+}
+
 /*** file ***/
 
 func editorOpen(filename string) {
@@ -138,25 +151,31 @@ func editorOpen(filename string) {
 
 	reader := bufio.NewReader(fp)
 
-	first_line, err := reader.ReadBytes('\n')
-	if err != nil {
-		die(err.Error())
-	}
-
-	// line := []byte("Hello world")
-	// line2 := []byte("Hello world, this is me and I'm trying this new functionality, it's cool")
-
-	r := erow{
-		size:  len(first_line),
-		chars: first_line,
-	}
-	// r2 := erow{
-	// 	size:  len(line2),
-	// 	chars: line2,
+	// first_line, err := reader.ReadBytes('\n')
+	// if err != nil {
+	// 	die(err.Error())
 	// }
 
-	editorConfig.rows = append(editorConfig.rows, r)
-	editorConfig.numrows = 1
+	for line, err := reader.ReadBytes('\n'); err == nil; line, err = reader.ReadBytes('\n') {
+		// trim newlines and trailing chars
+		for c := line[len(line)-1]; len(line) > 0 && (c == '\n' || c == '\r'); {
+			line = line[:len(line)-1]
+			if len(line) > 0 {
+				c = line[len(line)-1]
+			}
+		}
+
+		editorAppendRow(line)
+	}
+	// // trim newlines and trailing chars
+	// for c := first_line[len(first_line)-1]; len(first_line) > 0 && (c == '\n' || c == '\r'); {
+	// 	first_line = first_line[:len(first_line)-1]
+	// 	if len(first_line) > 0 {
+	// 		c = first_line[len(first_line)-1]
+	// 	}
+	// }
+	//
+	// editorAppendRow(first_line)
 }
 
 /*** input ***/
