@@ -1,10 +1,12 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
-	"golang.org/x/term"
 	"os"
+
+	"golang.org/x/term"
 )
 
 var GODITOR_VERSION = "0.0.1"
@@ -126,21 +128,35 @@ func die(str string) {
 
 /*** file ***/
 
-func editorOpen() {
-	line := []byte("Hello world")
-	line2 := []byte("Hello world, this is me and I'm trying this new functionality, it's cool")
+func editorOpen(filename string) {
+
+	fp, err := os.Open(filename)
+	if err != nil {
+		die(err.Error())
+	}
+	defer fp.Close()
+
+	reader := bufio.NewReader(fp)
+
+	first_line, err := reader.ReadBytes('\n')
+	if err != nil {
+		die(err.Error())
+	}
+
+	// line := []byte("Hello world")
+	// line2 := []byte("Hello world, this is me and I'm trying this new functionality, it's cool")
 
 	r := erow{
-		size:  len(line),
-		chars: line,
+		size:  len(first_line),
+		chars: first_line,
 	}
-	r2 := erow{
-		size:  len(line2),
-		chars: line2,
-	}
+	// r2 := erow{
+	// 	size:  len(line2),
+	// 	chars: line2,
+	// }
 
-	editorConfig.rows = append(editorConfig.rows, r, r2)
-	editorConfig.numrows = 2
+	editorConfig.rows = append(editorConfig.rows, r)
+	editorConfig.numrows = 1
 }
 
 /*** input ***/
@@ -197,7 +213,7 @@ func editorMoveCursor(key int) {
 func editorDrawRows() {
 	for i := 0; i < editorConfig.screenrows; i++ {
 		if i >= editorConfig.numrows {
-			if i == editorConfig.screenrows/3 {
+			if editorConfig.numrows == 0 && i == editorConfig.screenrows/3 {
 				welcome := fmt.Sprintf("Goditor editor -- version: %s", GODITOR_VERSION)
 
 				padding := (editorConfig.screencols - len(welcome)) / 2
@@ -263,9 +279,12 @@ func initEditor() {
 
 func main() {
 	enableRawMode()
-
 	initEditor()
-	editorOpen()
+
+	if len(os.Args) > 1 {
+		editorOpen(os.Args[1])
+	}
+
 	for {
 		editorRefreshScreen()
 		editorProcessKeyPress()
