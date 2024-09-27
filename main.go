@@ -27,6 +27,7 @@ type EditorConfig struct {
 	screenrows, screencols int
 	numrows                int
 	rows                   []erow
+	rowoff                 int
 }
 
 var (
@@ -217,7 +218,8 @@ func editorMoveCursor(key int) {
 
 func editorDrawRows() {
 	for i := 0; i < editorConfig.screenrows; i++ {
-		if i >= editorConfig.numrows {
+		filerow := i + editorConfig.rowoff
+		if filerow >= editorConfig.numrows {
 			if editorConfig.numrows == 0 && i == editorConfig.screenrows/3 {
 				welcome := fmt.Sprintf("Goditor editor -- version: %s", GODITOR_VERSION)
 
@@ -234,7 +236,7 @@ func editorDrawRows() {
 				byteBuffer.WriteString("~")
 			}
 		} else {
-			for _, c := range editorConfig.rows[i].chars {
+			for _, c := range editorConfig.rows[filerow].chars {
 				byteBuffer.WriteByte(c)
 			}
 		}
@@ -280,6 +282,7 @@ func initEditor() {
 	editorConfig.cursor_x = 0
 	editorConfig.cursor_y = 0
 	editorConfig.numrows = 0
+	editorConfig.rowoff = 0
 }
 
 func main() {
