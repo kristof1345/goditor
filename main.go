@@ -29,9 +29,11 @@ type EditorConfig struct {
 	rows                   []erow
 }
 
-var terminalState *term.State
-var byteBuffer = bytes.Buffer{}
-var editorConfig = EditorConfig{}
+var (
+	terminalState *term.State
+	byteBuffer    = bytes.Buffer{}
+	editorConfig  = EditorConfig{}
+)
 
 const (
 	ARROW_LEFT = iota + 1000
@@ -60,7 +62,6 @@ func enableRawMode() {
 func editorReadKey() int {
 	b := make([]byte, 4)
 	_, err := os.Stdin.Read(b)
-
 	if err != nil {
 		die("processing key")
 	}
@@ -142,7 +143,6 @@ func editorAppendRow(line []byte) {
 /*** file ***/
 
 func editorOpen(filename string) {
-
 	fp, err := os.Open(filename)
 	if err != nil {
 		die(err.Error())
@@ -150,11 +150,6 @@ func editorOpen(filename string) {
 	defer fp.Close()
 
 	reader := bufio.NewReader(fp)
-
-	// first_line, err := reader.ReadBytes('\n')
-	// if err != nil {
-	// 	die(err.Error())
-	// }
 
 	for line, err := reader.ReadBytes('\n'); err == nil; line, err = reader.ReadBytes('\n') {
 		// trim newlines and trailing chars
@@ -167,15 +162,6 @@ func editorOpen(filename string) {
 
 		editorAppendRow(line)
 	}
-	// // trim newlines and trailing chars
-	// for c := first_line[len(first_line)-1]; len(first_line) > 0 && (c == '\n' || c == '\r'); {
-	// 	first_line = first_line[:len(first_line)-1]
-	// 	if len(first_line) > 0 {
-	// 		c = first_line[len(first_line)-1]
-	// 	}
-	// }
-	//
-	// editorAppendRow(first_line)
 }
 
 /*** input ***/
