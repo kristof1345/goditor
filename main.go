@@ -208,6 +208,9 @@ func editorMoveCursor(key int) {
 			editorConfig.cursor_y--
 		}
 	case ARROW_DOWN:
+		if editorConfig.cursor_y < editorConfig.numrows {
+			editorConfig.cursor_y++
+		}
 		if editorConfig.cursor_y != editorConfig.screenrows-1 {
 			editorConfig.cursor_y++
 		}
@@ -215,6 +218,15 @@ func editorMoveCursor(key int) {
 }
 
 /*** output ***/
+
+func editorScroll() {
+	if editorConfig.cursor_y < editorConfig.rowoff {
+		editorConfig.rowoff = editorConfig.cursor_y
+	}
+	if editorConfig.cursor_y >= editorConfig.rowoff+editorConfig.screenrows {
+		editorConfig.rowoff = editorConfig.cursor_y - editorConfig.screenrows + 1
+	}
+}
 
 func editorDrawRows() {
 	for i := 0; i < editorConfig.screenrows; i++ {
@@ -249,6 +261,8 @@ func editorDrawRows() {
 }
 
 func editorRefreshScreen() {
+	editorScroll()
+
 	byteBuffer.WriteString("\x1b[?25l") // hide cursor
 	byteBuffer.WriteString("\x1b[H")
 
