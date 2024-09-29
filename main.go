@@ -28,6 +28,7 @@ type EditorConfig struct {
 	numrows                int
 	rows                   []erow
 	rowoff                 int
+	coloff                 int
 }
 
 var (
@@ -200,9 +201,9 @@ func editorMoveCursor(key int) {
 			editorConfig.cursor_x--
 		}
 	case ARROW_RIGHT:
-		if editorConfig.cursor_x != editorConfig.screencols-1 {
-			editorConfig.cursor_x++
-		}
+		// if editorConfig.cursor_x != editorConfig.screencols-1 {
+		editorConfig.cursor_x++
+		// }
 	case ARROW_UP:
 		if editorConfig.cursor_y != 0 {
 			editorConfig.cursor_y--
@@ -211,9 +212,9 @@ func editorMoveCursor(key int) {
 		if editorConfig.cursor_y < editorConfig.numrows {
 			editorConfig.cursor_y++
 		}
-		if editorConfig.cursor_y != editorConfig.screenrows-1 {
-			editorConfig.cursor_y++
-		}
+		// if editorConfig.cursor_y != editorConfig.screenrows-1 {
+		// 	editorConfig.cursor_y++
+		// }
 	}
 }
 
@@ -225,6 +226,13 @@ func editorScroll() {
 	}
 	if editorConfig.cursor_y >= editorConfig.rowoff+editorConfig.screenrows {
 		editorConfig.rowoff = editorConfig.cursor_y - editorConfig.screenrows + 1
+	}
+
+	if editorConfig.cursor_x < editorConfig.coloff {
+		editorConfig.coloff = editorConfig.cursor_x
+	}
+	if editorConfig.cursor_x >= editorConfig.coloff+editorConfig.screencols {
+		editorConfig.coloff = editorConfig.cursor_x - editorConfig.screencols + 1
 	}
 }
 
@@ -248,8 +256,20 @@ func editorDrawRows() {
 				byteBuffer.WriteString("~")
 			}
 		} else {
-			for _, c := range editorConfig.rows[filerow].chars {
-				byteBuffer.WriteByte(c)
+			length := editorConfig.rows[filerow].size - editorConfig.coloff
+			if length < 0 {
+				length = 0
+			}
+
+			if length > 0 {
+				if length > editorConfig.screencols {
+					length = editorConfig.screencols
+				}
+				rindex := editorConfig.coloff + length
+
+				for _, c := range editorConfig.rows[filerow].chars[editorConfig.coloff:rindex] {
+					byteBuffer.WriteByte(c)
+				}
 			}
 		}
 
@@ -272,8 +292,8 @@ func editorRefreshScreen() {
 	byteBuffer.WriteString(
 		fmt.Sprintf(
 			"\x1b[%d;%dH",
-			(editorConfig.cursor_y + 1),
-			(editorConfig.cursor_x + 1),
+			(editorConfig.cursor_y-editorConfig.rowoff)+1,
+			(editorConfig.cursor_x-editorConfig.coloff)+1,
 		),
 	)
 
@@ -297,6 +317,7 @@ func initEditor() {
 	editorConfig.cursor_y = 0
 	editorConfig.numrows = 0
 	editorConfig.rowoff = 0
+	editorConfig.coloff = 0
 }
 
 func main() {
