@@ -133,14 +133,28 @@ func die(str string) {
 
 /*** row operations ***/
 
+func editorUpdateRow(row *erow) {
+	row.render = make([]byte, row.size)
+
+	idx := 0
+	for _, c := range row.chars {
+		row.render[idx] = c
+		idx++
+	}
+
+	// row.render[i] = '\n'
+	row.rsize = idx
+}
+
 func editorAppendRow(line []byte) {
 	r := erow{
 		size:  len(line),
 		chars: line,
 	}
 
-	editorConfig.rows[editorConfig.numrows].rsize = 0
-	editorConfig.rows[editorConfig.numrows].render = nil
+	// editorConfig.rows[editorConfig.numrows].rsize = 0
+	// editorConfig.rows[editorConfig.numrows].render = nil
+	editorUpdateRow(&r)
 
 	editorConfig.rows = append(editorConfig.rows, r)
 	// E.row[at].chars[len] = '\0' - make note of this - we might need it, I dunno what it does
@@ -287,7 +301,7 @@ func editorDrawRows() {
 				byteBuffer.WriteString("~")
 			}
 		} else {
-			length := editorConfig.rows[filerow].size - editorConfig.coloff
+			length := editorConfig.rows[filerow].rsize - editorConfig.coloff
 			if length < 0 {
 				length = 0
 			}
@@ -298,7 +312,7 @@ func editorDrawRows() {
 				}
 				rindex := editorConfig.coloff + length
 
-				for _, c := range editorConfig.rows[filerow].chars[editorConfig.coloff:rindex] {
+				for _, c := range editorConfig.rows[filerow].render[editorConfig.coloff:rindex] {
 					byteBuffer.WriteByte(c)
 				}
 			}
