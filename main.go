@@ -11,6 +11,8 @@ import (
 
 var GODITOR_VERSION = "0.0.1"
 
+const KILO_TAB_STOP = 8
+
 func CONTROL_KEY(key byte) int {
 	return int(key & 0x1f)
 }
@@ -134,12 +136,29 @@ func die(str string) {
 /*** row operations ***/
 
 func editorUpdateRow(row *erow) {
-	row.render = make([]byte, row.size)
+	tabs := 0
+	for _, t := range row.chars {
+		if t == '\t' {
+			tabs++
+		}
+	}
+
+	row.render = make([]byte, row.size+tabs*(KILO_TAB_STOP-1))
 
 	idx := 0
 	for _, c := range row.chars {
-		row.render[idx] = c
-		idx++
+		if c == '\t' {
+			row.render[idx] = ' '
+			idx++
+
+			for (idx % KILO_TAB_STOP) != 0 { // 8 is the tabstop
+				row.render[idx] = ' '
+				idx++
+			}
+		} else {
+			row.render[idx] = c
+			idx++
+		}
 	}
 
 	// row.render[i] = '\n'
