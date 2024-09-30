@@ -18,8 +18,10 @@ func CONTROL_KEY(key byte) int {
 /*** data ***/
 
 type erow struct {
-	size  int
-	chars []byte
+	rsize  int
+	size   int
+	render []byte
+	chars  []byte
 }
 
 type EditorConfig struct {
@@ -137,6 +139,9 @@ func editorAppendRow(line []byte) {
 		chars: line,
 	}
 
+	editorConfig.rows[editorConfig.numrows].rsize = 0
+	editorConfig.rows[editorConfig.numrows].render = nil
+
 	editorConfig.rows = append(editorConfig.rows, r)
 	// E.row[at].chars[len] = '\0' - make note of this - we might need it, I dunno what it does
 	editorConfig.numrows += 1
@@ -195,14 +200,32 @@ func editorProcessKeyPress() {
 }
 
 func editorMoveCursor(key int) {
+	// var row *erow
+	// if editorConfig.cursor_y >= editorConfig.numrows {
+	// 	row = nil
+	// } else {
+	// 	row = &editorConfig.rows[editorConfig.cursor_y]
+	// }
+
 	switch key {
 	case ARROW_LEFT:
 		if editorConfig.cursor_x != 0 {
 			editorConfig.cursor_x--
+		} else if editorConfig.cursor_y > 0 {
+			editorConfig.cursor_y--
+			editorConfig.cursor_x = editorConfig.rows[editorConfig.cursor_y].size
 		}
 	case ARROW_RIGHT:
-		// if editorConfig.cursor_x != editorConfig.screencols-1 {
-		editorConfig.cursor_x++
+		if editorConfig.cursor_y < editorConfig.numrows {
+			if editorConfig.cursor_x < editorConfig.rows[editorConfig.cursor_y].size {
+				editorConfig.cursor_x++
+			} else if editorConfig.cursor_x == editorConfig.rows[editorConfig.cursor_y].size {
+				editorConfig.cursor_x = 0
+				editorConfig.cursor_y++
+			}
+		}
+		// if row != nil && editorConfig.cursor_x < row.size {
+		// 	editorConfig.cursor_x++
 		// }
 	case ARROW_UP:
 		if editorConfig.cursor_y != 0 {
@@ -215,6 +238,14 @@ func editorMoveCursor(key int) {
 		// if editorConfig.cursor_y != editorConfig.screenrows-1 {
 		// 	editorConfig.cursor_y++
 		// }
+	}
+
+	rowlen := 0
+	if editorConfig.cursor_y < editorConfig.numrows {
+		rowlen = editorConfig.rows[editorConfig.cursor_y].size
+	}
+	if editorConfig.cursor_x > rowlen {
+		editorConfig.cursor_x = rowlen
 	}
 }
 
