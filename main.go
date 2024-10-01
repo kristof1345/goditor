@@ -11,6 +11,8 @@ import (
 
 var GODITOR_VERSION = "0.0.1"
 
+const KILO_TAB_STOP = 8
+
 func CONTROL_KEY(key byte) int {
 	return int(key & 0x1f)
 }
@@ -18,8 +20,10 @@ func CONTROL_KEY(key byte) int {
 /*** data ***/
 
 type erow struct {
-	size  int
-	chars []byte
+	rsize  int
+	size   int
+	render []byte
+	chars  []byte
 }
 
 type EditorConfig struct {
@@ -33,8 +37,8 @@ type EditorConfig struct {
 
 var (
 	terminalState *term.State
-	// byteBuffer    = bytes.Buffer{}
-	editorConfig = EditorConfig{}
+	// bbuf    = bytes.Buffer{}
+	E = EditorConfig{}
 )
 
 const (
@@ -131,15 +135,47 @@ func die(str string) {
 
 /*** row operations ***/
 
+func editorUpdateRow(row *erow) {
+	tabs := 0
+	for _, t := range row.chars {
+		if t == '\t' {
+			tabs++
+		}
+	}
+
+	row.render = make([]byte, row.size+tabs*(KILO_TAB_STOP-1))
+
+	idx := 0
+	for _, c := range row.chars {
+		if c == '\t' {
+			row.render[idx] = ' '
+			idx++
+
+			for (idx % KILO_TAB_STOP) != 0 { // 8 is the tabstop
+				row.render[idx] = ' '
+				idx++
+			}
+		} else {
+			row.render[idx] = c
+			idx++
+		}
+	}
+
+	// row.render[i] = '\n'
+	row.rsize = idx
+}
+
 func editorAppendRow(line []byte) {
 	r := erow{
 		size:  len(line),
 		chars: line,
 	}
 
-	editorConfig.rows = append(editorConfig.rows, r)
+	editorUpdateRow(&r)
+
+	E.rows = append(E.rows, r)
 	// E.row[at].chars[len] = '\0' - make note of this - we might need it, I dunno what it does
-	editorConfig.numrows += 1
+	E.numrows += 1
 }
 
 /*** file ***/
@@ -180,11 +216,11 @@ func editorProcessKeyPress() {
 	case ARROW_DOWN, ARROW_LEFT, ARROW_RIGHT, ARROW_UP:
 		editorMoveCursor(ch)
 	case HOME_KEY:
-		editorConfig.cursor_x = 0
+		E.cursor_x = 0
 	case END_KEY:
-		editorConfig.cursor_x = editorConfig.screencols - 1
+		E.cursor_x = E.screencols - 1
 	case PAGE_DOWN, PAGE_UP:
-		for times := editorConfig.screenrows; times > 0; times-- {
+		for times := E.screenrows; times > 0; times-- {
 			if ch == PAGE_UP {
 				editorMoveCursor(ARROW_UP)
 			} else {
@@ -195,54 +231,76 @@ func editorProcessKeyPress() {
 }
 
 func editorMoveCursor(key int) {
+	// NOT sure about these
+	// var row *erow
+	// if E.cursor_y >= E.numrows {
+	// 	row = nil
+	// } else {
+	// 	row = &E.rows[E.cursor_y]
+	// }
+
 	switch key {
 	case ARROW_LEFT:
-		if editorConfig.cursor_x != 0 {
-			editorConfig.cursor_x--
+		if E.cursor_x != 0 {
+			E.cursor_x--
+		} else if E.cursor_y > 0 {
+			E.cursor_y--
+			E.cursor_x = E.rows[E.cursor_y].size
 		}
 	case ARROW_RIGHT:
-		// if editorConfig.cursor_x != editorConfig.screencols-1 {
-		editorConfig.cursor_x++
-		// }
+		if E.cursor_y < E.numrows {
+			if E.cursor_x < E.rows[E.cursor_y].size {
+				E.cursor_x++
+			} else if E.cursor_x == E.rows[E.cursor_y].size {
+				E.cursor_x = 0
+				E.cursor_y++
+			}
+		}
 	case ARROW_UP:
-		if editorConfig.cursor_y != 0 {
-			editorConfig.cursor_y--
+		if E.cursor_y != 0 {
+			E.cursor_y--
 		}
 	case ARROW_DOWN:
-		if editorConfig.cursor_y < editorConfig.numrows {
-			editorConfig.cursor_y++
+		if E.cursor_y < E.numrows {
+			E.cursor_y++
 		}
-		// if editorConfig.cursor_y != editorConfig.screenrows-1 {
-		// 	editorConfig.cursor_y++
-		// }
+	}
+
+	rowlen := 0
+	if E.cursor_y < E.numrows {
+		rowlen = E.rows[E.cursor_y].size
+	}
+	if E.cursor_x > rowlen {
+		E.cursor_x = rowlen
 	}
 }
 
 /*** output ***/
 
 func editorScroll() {
-	if editorConfig.cursor_y < editorConfig.rowoff {
-		editorConfig.rowoff = editorConfig.cursor_y
+	if E.cursor_y < E.rowoff {
+		E.rowoff = E.cursor_y
 	}
-	if editorConfig.cursor_y >= editorConfig.rowoff+editorConfig.screenrows {
-		editorConfig.rowoff = editorConfig.cursor_y - editorConfig.screenrows + 1
+	if E.cursor_y >= E.rowoff+E.screenrows {
+		E.rowoff = E.cursor_y - E.screenrows + 1
 	}
-	if editorConfig.cursor_x < editorConfig.coloff {
-		editorConfig.coloff = editorConfig.cursor_x
+
+	if E.cursor_x < E.coloff {
+		E.coloff = E.cursor_x
 	}
-	if editorConfig.cursor_x >= editorConfig.coloff+editorConfig.screencols {
-		editorConfig.coloff = editorConfig.cursor_x - editorConfig.screencols + 1
+	if E.cursor_x >= E.coloff+E.screencols {
+		E.coloff = E.cursor_x - E.screencols + 1
 	}
 }
 
 func editorDrawRows(bbuf *bytes.Buffer) {
-	for i := 0; i < editorConfig.screenrows; i++ {
-		filerow := i + editorConfig.rowoff
-		if filerow >= editorConfig.numrows {
-			if editorConfig.numrows == 0 && i == editorConfig.screenrows/3 {
+	for i := 0; i < E.screenrows; i++ {
+		filerow := i + E.rowoff
+		if filerow >= E.numrows {
+			if E.numrows == 0 && i == E.screenrows/3 {
 				welcome := fmt.Sprintf("Goditor editor -- version: %s", GODITOR_VERSION)
 
-				padding := (editorConfig.screencols - len(welcome)) / 2
+				padding := (E.screencols - len(welcome)) / 2
 				if padding > 0 {
 					bbuf.WriteString("~")
 				}
@@ -255,23 +313,25 @@ func editorDrawRows(bbuf *bytes.Buffer) {
 				bbuf.WriteString("~")
 			}
 		} else {
-			length := editorConfig.rows[filerow].size - editorConfig.coloff
+			length := E.rows[filerow].rsize - E.coloff
 			if length < 0 {
 				length = 0
 			}
+
 			if length > 0 {
-				if length > editorConfig.screencols {
-					length = editorConfig.screencols
+				if length > E.screencols {
+					length = E.screencols
 				}
-				rindex := editorConfig.coloff + length
-				for _, c := range editorConfig.rows[filerow].chars[editorConfig.coloff:rindex] {
+				rindex := E.coloff + length
+
+				for _, c := range E.rows[filerow].render[E.coloff:rindex] {
 					bbuf.WriteByte(c)
 				}
 			}
 		}
 
 		bbuf.WriteString("\x1b[K") // clear reset of the line
-		if i < editorConfig.screenrows-1 {
+		if i < E.screenrows-1 {
 			bbuf.WriteString("\r\n")
 		}
 	}
@@ -282,18 +342,17 @@ func editorRefreshScreen() {
 
 	bbuf := bytes.Buffer{}
 
-	// byteBuffer.Reset()
 	bbuf.WriteString("\x1b[?25l") // hide cursor
 	bbuf.WriteString("\x1b[H")
 
 	editorDrawRows(&bbuf)
 
-	// byteBuffer.WriteString("\x1b[H")
+	// bbuf.WriteString("\x1b[H")
 	bbuf.WriteString(
 		fmt.Sprintf(
 			"\x1b[%d;%dH",
-			(editorConfig.cursor_y-editorConfig.rowoff)+1,
-			(editorConfig.cursor_x-editorConfig.coloff)+1,
+			(E.cursor_y-E.rowoff)+1,
+			(E.cursor_x-E.coloff)+1,
 		),
 	)
 
@@ -311,13 +370,13 @@ func initEditor() {
 		die(err.Error() + " init")
 	}
 
-	editorConfig.screenrows = height
-	editorConfig.screencols = width
-	editorConfig.cursor_x = 0
-	editorConfig.cursor_y = 0
-	editorConfig.numrows = 0
-	editorConfig.rowoff = 0
-	editorConfig.coloff = 0
+	E.screenrows = height
+	E.screencols = width
+	E.cursor_x = 0
+	E.cursor_y = 0
+	E.numrows = 0
+	E.rowoff = 0
+	E.coloff = 0
 }
 
 func main() {
