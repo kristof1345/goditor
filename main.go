@@ -33,6 +33,7 @@ type EditorConfig struct {
 	rows                   []erow
 	rowoff                 int
 	coloff                 int
+	rx                     int
 }
 
 var (
@@ -135,6 +136,19 @@ func die(str string) {
 
 /*** row operations ***/
 
+func editorRowCxToRx(row *erow, cx int) int {
+	rx := 0
+
+	for i := 0; i < cx; i++ {
+		if row.chars[i] == '\t' {
+			rx += (KILO_TAB_STOP - 1) - (rx % KILO_TAB_STOP)
+		}
+		rx += 1
+	}
+
+	return rx
+}
+
 func editorUpdateRow(row *erow) {
 	tabs := 0
 	for _, t := range row.chars {
@@ -161,7 +175,7 @@ func editorUpdateRow(row *erow) {
 		}
 	}
 
-	// row.render[i] = '\n'
+	// row.render[idx] = '\n'
 	row.rsize = idx
 }
 
@@ -312,6 +326,13 @@ func editorMoveCursor(key int) {
 /*** output ***/
 
 func editorScroll() {
+	// E.rx = E.cursor_x
+
+	E.rx = 0
+	if E.cursor_y < E.numrows {
+		E.rx = editorRowCxToRx(&E.rows[E.cursor_y], E.cursor_x)
+	}
+
 	if E.cursor_y < E.rowoff {
 		E.rowoff = E.cursor_y
 	}
@@ -319,11 +340,11 @@ func editorScroll() {
 		E.rowoff = E.cursor_y - E.screenrows + 1
 	}
 
-	if E.cursor_x < E.coloff {
-		E.coloff = E.cursor_x
+	if E.rx < E.coloff {
+		E.coloff = E.rx
 	}
-	if E.cursor_x >= E.coloff+E.screencols {
-		E.coloff = E.cursor_x - E.screencols + 1
+	if E.rx >= E.coloff+E.screencols {
+		E.coloff = E.rx - E.screencols + 1
 	}
 }
 
@@ -386,7 +407,7 @@ func editorRefreshScreen() {
 		fmt.Sprintf(
 			"\x1b[%d;%dH",
 			(E.cursor_y-E.rowoff)+1,
-			(E.cursor_x-E.coloff)+1,
+			(E.rx-E.coloff)+1,
 		),
 	)
 
@@ -411,6 +432,7 @@ func initEditor() {
 	E.numrows = 0
 	E.rowoff = 0
 	E.coloff = 0
+	E.rx = 0
 }
 
 func main() {
