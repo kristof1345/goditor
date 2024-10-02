@@ -34,6 +34,7 @@ type EditorConfig struct {
 	rowoff                 int
 	coloff                 int
 	rx                     int
+	filename               string
 }
 
 var (
@@ -195,6 +196,8 @@ func editorAppendRow(line []byte) {
 /*** file ***/
 
 func editorOpen(filename string) {
+	E.filename = filename
+
 	fp, err := os.Open(filename)
 	if err != nil {
 		die(err.Error())
@@ -386,10 +389,42 @@ func editorDrawRows(bbuf *bytes.Buffer) {
 		}
 
 		bbuf.WriteString("\x1b[K") // clear reset of the line
-		if i < E.screenrows-1 {
-			bbuf.WriteString("\r\n")
+		bbuf.WriteString("\r\n")
+	}
+}
+
+func editorDrawStatusBar(bbuf *bytes.Buffer) {
+	bbuf.WriteString("\x1b[7m") // invert color scheme of everything after this
+
+	truncFilename := E.filename
+	if len(E.filename) > 20 {
+		truncFilename = E.filename[:17] + "..."
+	} else if E.filename == "" {
+		truncFilename = "[No Name]"
+	}
+
+	status := fmt.Sprintf("%s - %d lines", truncFilename, E.numrows)
+	rstatus := fmt.Sprintf("%d/%d", E.cursor_y+1, E.numrows)
+
+	ln := len(status)
+	if ln > E.screencols {
+		ln = E.screencols
+	}
+	rlen := len(rstatus)
+
+	bbuf.WriteString(status[:ln])
+
+	for ln < E.screencols {
+		if E.screencols-ln == rlen {
+			bbuf.WriteString(rstatus)
+			break
+		} else {
+			bbuf.WriteString(" ")
+			ln++
 		}
 	}
+
+	bbuf.WriteString("\x1b[m") // close off inverting
 }
 
 func editorRefreshScreen() {
@@ -401,6 +436,7 @@ func editorRefreshScreen() {
 	bbuf.WriteString("\x1b[H")
 
 	editorDrawRows(&bbuf)
+	editorDrawStatusBar(&bbuf)
 
 	// bbuf.WriteString("\x1b[H")
 	bbuf.WriteString(
@@ -433,6 +469,9 @@ func initEditor() {
 	E.rowoff = 0
 	E.coloff = 0
 	E.rx = 0
+	E.filename = ""
+
+	E.screenrows -= 1
 }
 
 func main() {
