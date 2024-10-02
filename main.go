@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"time"
 
 	"golang.org/x/term"
 )
@@ -35,6 +36,8 @@ type EditorConfig struct {
 	coloff                 int
 	rx                     int
 	filename               string
+	statusmsg              string
+	statusmsg_time         time.Time
 }
 
 var (
@@ -425,6 +428,20 @@ func editorDrawStatusBar(bbuf *bytes.Buffer) {
 	}
 
 	bbuf.WriteString("\x1b[m") // close off inverting
+	bbuf.WriteString("\r\n")   // close off inverting
+}
+
+func editorDrawMessageBar(bbuf *bytes.Buffer) {
+	bbuf.WriteString("\x1b[K")
+
+	msglen := len(E.statusmsg)
+	if msglen > E.screencols {
+		msglen = E.screencols
+	}
+
+	if msglen > 0 && (time.Now().Sub(E.statusmsg_time) < 5*time.Second) {
+		bbuf.WriteString(E.statusmsg)
+	}
 }
 
 func editorRefreshScreen() {
@@ -437,6 +454,7 @@ func editorRefreshScreen() {
 
 	editorDrawRows(&bbuf)
 	editorDrawStatusBar(&bbuf)
+	editorDrawMessageBar(&bbuf)
 
 	// bbuf.WriteString("\x1b[H")
 	bbuf.WriteString(
@@ -450,6 +468,11 @@ func editorRefreshScreen() {
 	bbuf.WriteString("\x1b[?25h") // reposition cursor
 
 	os.Stdout.Write(bbuf.Bytes())
+}
+
+func editorSetStatusMessage(args ...interface{}) {
+	E.statusmsg = fmt.Sprintf(args[0].(string), args[1:]...)
+	E.statusmsg_time = time.Now()
 }
 
 /*** init ***/
@@ -470,8 +493,9 @@ func initEditor() {
 	E.coloff = 0
 	E.rx = 0
 	E.filename = ""
+	E.statusmsg = ""
 
-	E.screenrows -= 1
+	E.screenrows -= 2
 }
 
 func main() {
@@ -481,6 +505,8 @@ func main() {
 	if len(os.Args) > 1 {
 		editorOpen(os.Args[1])
 	}
+
+	editorSetStatusMessage("HELP: Ctrl-Q = quit")
 
 	for {
 		editorRefreshScreen()
