@@ -231,13 +231,13 @@ func editorProcessKeyPress() {
 }
 
 func editorMoveCursor(key int) {
-	// NOT sure about these
-	// var row *erow
-	// if E.cursor_y >= E.numrows {
-	// 	row = nil
-	// } else {
-	// 	row = &E.rows[E.cursor_y]
-	// }
+	// the tutorial has this but I'm hesitant about what it does
+	var row *erow
+	if E.cursor_y >= E.numrows {
+		row = nil
+	} else {
+		row = &E.rows[E.cursor_y]
+	}
 
 	switch key {
 	case ARROW_LEFT:
@@ -247,14 +247,30 @@ func editorMoveCursor(key int) {
 			E.cursor_y--
 			E.cursor_x = E.rows[E.cursor_y].size
 		}
+		// stuff from go-kilo
+		// if E.cursor_x != 0 {
+		// 	E.cursor_x--
+		// } else if E.cursor_y > 0 {
+		// 	E.cursor_y--
+		// 	E.cursor_x = E.rows[E.cursor_y].size
+		// }
 	case ARROW_RIGHT:
-		if E.cursor_y < E.numrows {
-			if E.cursor_x < E.rows[E.cursor_y].size {
-				E.cursor_x++
-			} else if E.cursor_x == E.rows[E.cursor_y].size {
-				E.cursor_x = 0
-				E.cursor_y++
-			}
+		// this is the stuff from go-kilo
+		// if E.cursor_y < E.numrows {
+		// 	if E.cursor_x < E.rows[E.cursor_y].size {
+		// 		E.cursor_x++
+		// 	} else if E.cursor_x == E.rows[E.cursor_y].size {
+		// 		E.cursor_x = 0
+		// 		E.cursor_y++
+		// 	}
+		// }
+
+		// this is from the tutorial
+		if row != nil && E.cursor_x < row.size {
+			E.cursor_x++
+		} else if row != nil && E.cursor_x == row.size {
+			E.cursor_y++
+			E.cursor_x = 0
 		}
 	case ARROW_UP:
 		if E.cursor_y != 0 {
@@ -266,13 +282,31 @@ func editorMoveCursor(key int) {
 		}
 	}
 
-	rowlen := 0
-	if E.cursor_y < E.numrows {
-		rowlen = E.rows[E.cursor_y].size
+	if E.cursor_y >= E.numrows {
+		row = nil
+	} else {
+		row = &E.rows[E.cursor_y]
 	}
+
+	rowlen := 0
+	if row != nil {
+		rowlen = row.size
+	} else {
+		rowlen = 0
+	}
+
 	if E.cursor_x > rowlen {
 		E.cursor_x = rowlen
 	}
+
+	// stuff from go-kilo
+	// rowlen := 0
+	// if E.cursor_y < E.numrows {
+	// 	rowlen = E.rows[E.cursor_y].size
+	// }
+	// if E.cursor_x > rowlen {
+	// 	E.cursor_x = rowlen
+	// }
 }
 
 /*** output ***/
