@@ -196,6 +196,31 @@ func editorAppendRow(line []byte) {
 	E.numrows += 1
 }
 
+func editorRowInsertChar(row *erow, at int, c byte) {
+	if at < 0 || at > row.size {
+		at = row.size
+	}
+
+	row.chars = append(
+		row.chars[:at],
+		append(append(make([]byte, 0), c), row.chars[at:]...)...,
+	)
+
+	row.size = len(row.chars)
+	editorUpdateRow(row)
+}
+
+/*** editor operations ***/
+
+func editorInsertChar(c byte) {
+	if E.cursor_y == E.numrows {
+		editorAppendRow(make([]byte, 0))
+	}
+
+	editorRowInsertChar(&E.rows[E.cursor_y], E.cursor_x, c)
+	E.cursor_x += 1
+}
+
 /*** file ***/
 
 func editorOpen(filename string) {
@@ -247,6 +272,8 @@ func editorProcessKeyPress() {
 				editorMoveCursor(ARROW_DOWN)
 			}
 		}
+	default:
+		editorInsertChar(byte(ch))
 	}
 }
 
