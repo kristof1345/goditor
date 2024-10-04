@@ -14,6 +14,7 @@ import (
 var GODITOR_VERSION = "0.0.1"
 
 const KILO_TAB_STOP = 8
+const KILO_QUIT_TIMES = 2
 
 func CONTROL_KEY(key byte) int {
 	return int(key & 0x1f)
@@ -39,6 +40,7 @@ type EditorConfig struct {
 	filename               string
 	statusmsg              string
 	statusmsg_time         time.Time
+	dirty                  bool
 }
 
 var (
@@ -185,17 +187,46 @@ func editorUpdateRow(row *erow) {
 	row.rsize = idx
 }
 
-func editorAppendRow(line []byte) {
-	r := erow{
-		size:  len(line),
-		chars: line,
+func editorInsertRow(at int, s []byte) {
+	if at < 0 || at > E.numrows {
+		return
+	}
+	var r erow
+	r.chars = s
+	r.size = len(s)
+	// r := erow{
+	// 	size:  len(line),
+	// 	chars: line,
+	// }
+
+	if at == 0 {
+		t := make([]erow, 1)
+		t[0] = r
+		E.rows = append(t, E.rows...)
+	} else if at == E.numrows {
+		E.rows = append(E.rows, r)
+	} else {
+		t := make([]erow, 1)
+		t[0] = r
+		E.rows = append(E.rows[:at], append(t, E.rows[at:]...)...)
 	}
 
-	editorUpdateRow(&r)
-
-	E.rows = append(E.rows, r)
-	// E.row[at].chars[len] = '\0' - make note of this - we might need it, I dunno what it does
+	editorUpdateRow(&E.rows[at])
+	// E.rows = append(E.rows, r)
 	E.numrows += 1
+	E.dirty = true
+}
+
+func editorDelRow(at int) {
+	if at < 0 || at >= E.numrows {
+		return
+	}
+	E.rows = append(E.rows[:at], E.rows[at+1:]...)
+	E.dirty = true
+	E.numrows--
+	// for j := at; j < E.numrows; j++ {
+	// E.rows[j].idx
+	// }
 }
 
 func editorRowInsertChar(row *erow, at int, c byte) {
@@ -212,15 +243,74 @@ func editorRowInsertChar(row *erow, at int, c byte) {
 	editorUpdateRow(row)
 }
 
+func editorRowAppendString(row *erow, s []byte) {
+	row.chars = append(row.chars, s...)
+	row.size = len(row.chars)
+	editorUpdateRow(row)
+	E.dirty = true
+}
+
+func editorRowDelChar(row *erow, at int) {
+	if at < 0 || at > row.size {
+		at = row.size
+	}
+
+	row.chars = append(
+		row.chars[:at],
+		row.chars[at+1:]...,
+	)
+
+	row.size--
+	editorUpdateRow(row)
+}
+
 /*** editor operations ***/
 
 func editorInsertChar(c byte) {
 	if E.cursor_y == E.numrows {
-		editorAppendRow(make([]byte, 0))
+		var emptyRow []byte
+		editorInsertRow(E.numrows, emptyRow)
 	}
 
 	editorRowInsertChar(&E.rows[E.cursor_y], E.cursor_x, c)
 	E.cursor_x += 1
+	E.dirty = true
+}
+
+func editorInsertNewLine() {
+	if E.cursor_x == 0 {
+		editorInsertRow(E.cursor_y, make([]byte, 0))
+	} else {
+		editorInsertRow(E.cursor_y+1, E.rows[E.cursor_y].chars[E.cursor_x:])
+		E.rows[E.cursor_y].chars = E.rows[E.cursor_y].chars[:E.cursor_x]
+		E.rows[E.cursor_y].size = len(E.rows[E.cursor_y].chars)
+		editorUpdateRow(&E.rows[E.cursor_y])
+
+	}
+
+	E.cursor_y++
+	E.cursor_x = 0
+}
+
+func editorDelChar() {
+	if E.cursor_y == E.numrows {
+		return
+	}
+	if E.cursor_x == 0 && E.cursor_y == 0 {
+		return
+	}
+
+	var row *erow = &E.rows[E.cursor_y]
+	if E.cursor_x > 0 {
+		editorRowDelChar(row, E.cursor_x-1)
+		E.cursor_x--
+		E.dirty = true
+	} else {
+		E.cursor_x = E.rows[E.cursor_y-1].size
+		editorRowAppendString(&E.rows[E.cursor_y-1], row.chars)
+		editorDelRow(E.cursor_y)
+		E.cursor_y--
+	}
 }
 
 /*** file ***/
@@ -245,7 +335,7 @@ func editorOpen(filename string) {
 			}
 		}
 
-		editorAppendRow(line)
+		editorInsertRow(E.numrows, line)
 	}
 }
 
@@ -275,13 +365,10 @@ func editorSave() {
 	}
 	defer fd.Close()
 
-	n, err := io.WriteString(fd, buf)
+	_, err = io.WriteString(fd, buf)
 	if err == nil {
-		if n == ln {
-			editorSetStatusMessage(fmt.Sprintf("Wrote %d bytes to disk", ln))
-		} else {
-			editorSetStatusMessage(fmt.Sprintf("Wanted to write %d bytes, wrote %d", ln, n))
-		}
+		editorSetStatusMessage(fmt.Sprintf("Wrote %d bytes to %s", ln, E.filename))
+		E.dirty = false
 		return
 	}
 	editorSetStatusMessage("Couldn't save file to disk. I/O error: %s", err)
@@ -289,12 +376,20 @@ func editorSave() {
 
 /*** input ***/
 
+var quitTimes int = KILO_QUIT_TIMES
+
 func editorProcessKeyPress() {
 	ch := editorReadKey()
 	switch ch {
 	case '\r':
+		editorInsertNewLine()
 		break
 	case CONTROL_KEY('q'):
+		if E.dirty && quitTimes > 0 {
+			editorSetStatusMessage(fmt.Sprintf("Warning! File has unsaved changes. Press CTRL-Q %d more times to quit.", quitTimes))
+			quitTimes -= 1
+			return
+		}
 		os.Stdout.Write([]byte("\x1b[2J")) // clear screen
 		os.Stdout.Write([]byte("\x1b[3J")) // clear scrollback history
 		os.Stdout.Write([]byte("\x1b[H"))
@@ -311,6 +406,10 @@ func editorProcessKeyPress() {
 		editorSave()
 
 	case BACKSPACE, CONTROL_KEY('h'), DEL_KEY:
+		if ch == DEL_KEY {
+			editorMoveCursor(ARROW_RIGHT)
+		}
+		editorDelChar()
 		break
 
 	case PAGE_DOWN, PAGE_UP:
@@ -327,6 +426,8 @@ func editorProcessKeyPress() {
 	default:
 		editorInsertChar(byte(ch))
 	}
+
+	quitTimes = KILO_QUIT_TIMES
 }
 
 func editorMoveCursor(key int) {
@@ -485,7 +586,13 @@ func editorDrawStatusBar(bbuf *bytes.Buffer) {
 		truncFilename = "[No Name]"
 	}
 
-	status := fmt.Sprintf("%s - %d lines", truncFilename, E.numrows)
+	status := ""
+	if E.dirty {
+		status = fmt.Sprintf("%s(modified) - %d lines", truncFilename, E.numrows)
+	} else {
+		status = fmt.Sprintf("%s - %d lines", truncFilename, E.numrows)
+	}
+
 	rstatus := fmt.Sprintf("%d/%d", E.cursor_y+1, E.numrows)
 
 	ln := len(status)
@@ -573,6 +680,7 @@ func initEditor() {
 	E.rx = 0
 	E.filename = ""
 	E.statusmsg = ""
+	E.dirty = false
 
 	E.screenrows -= 2
 }
@@ -585,7 +693,7 @@ func main() {
 		editorOpen(os.Args[1])
 	}
 
-	editorSetStatusMessage("HELP: Ctrl-Q = quit")
+	editorSetStatusMessage("HELP: CTRL-S = save | CTRL-Q = quit")
 
 	for {
 		editorRefreshScreen()
