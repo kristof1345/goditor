@@ -13,8 +13,8 @@ import (
 
 var GODITOR_VERSION = "0.0.1"
 
-const KILO_TAB_STOP = 8
-const KILO_QUIT_TIMES = 2
+const GODITOR_TAB_STOP = 8
+const GODITOR_QUIT_TIMES = 2
 
 func CONTROL_KEY(key byte) int {
 	return int(key & 0x1f)
@@ -149,7 +149,7 @@ func editorRowCxToRx(row *erow, cx int) int {
 
 	for i := 0; i < cx; i++ {
 		if row.chars[i] == '\t' {
-			rx += (KILO_TAB_STOP - 1) - (rx % KILO_TAB_STOP)
+			rx += (GODITOR_TAB_STOP - 1) - (rx % GODITOR_TAB_STOP)
 		}
 		rx += 1
 	}
@@ -165,7 +165,7 @@ func editorUpdateRow(row *erow) {
 		}
 	}
 
-	row.render = make([]byte, row.size+tabs*(KILO_TAB_STOP-1))
+	row.render = make([]byte, row.size+tabs*(GODITOR_TAB_STOP-1))
 
 	idx := 0
 	for _, c := range row.chars {
@@ -173,7 +173,7 @@ func editorUpdateRow(row *erow) {
 			row.render[idx] = ' '
 			idx++
 
-			for (idx % KILO_TAB_STOP) != 0 { // 8 is the tabstop
+			for (idx % GODITOR_TAB_STOP) != 0 { // 8 is the tabstop
 				row.render[idx] = ' '
 				idx++
 			}
@@ -376,7 +376,7 @@ func editorSave() {
 
 /*** input ***/
 
-var quitTimes int = KILO_QUIT_TIMES
+var quitTimes int = GODITOR_QUIT_TIMES
 
 func editorProcessKeyPress() {
 	ch := editorReadKey()
@@ -427,7 +427,7 @@ func editorProcessKeyPress() {
 		editorInsertChar(byte(ch))
 	}
 
-	quitTimes = KILO_QUIT_TIMES
+	quitTimes = GODITOR_QUIT_TIMES
 }
 
 func editorMoveCursor(key int) {
@@ -447,7 +447,7 @@ func editorMoveCursor(key int) {
 			E.cursor_y--
 			E.cursor_x = E.rows[E.cursor_y].size
 		}
-		// stuff from go-kilo
+		// stuff from go-GODITOR
 		// if E.cursor_x != 0 {
 		// 	E.cursor_x--
 		// } else if E.cursor_y > 0 {
@@ -455,7 +455,7 @@ func editorMoveCursor(key int) {
 		// 	E.cursor_x = E.rows[E.cursor_y].size
 		// }
 	case ARROW_RIGHT:
-		// this is the stuff from go-kilo
+		// this is the stuff from go-GODITOR
 		// if E.cursor_y < E.numrows {
 		// 	if E.cursor_x < E.rows[E.cursor_y].size {
 		// 		E.cursor_x++
@@ -499,7 +499,7 @@ func editorMoveCursor(key int) {
 		E.cursor_x = rowlen
 	}
 
-	// stuff from go-kilo
+	// stuff from go-GODITOR
 	// rowlen := 0
 	// if E.cursor_y < E.numrows {
 	// 	rowlen = E.rows[E.cursor_y].size
