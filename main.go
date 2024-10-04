@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"time"
 
@@ -47,6 +48,7 @@ var (
 )
 
 const (
+	BACKSPACE  = 127
 	ARROW_LEFT = iota + 1000
 	ARROW_RIGHT
 	ARROW_UP
@@ -247,11 +249,51 @@ func editorOpen(filename string) {
 	}
 }
 
+func editorRowsToString() (string, int) {
+	totlen := 0
+	buf := ""
+
+	for _, row := range E.rows {
+		totlen = row.size + 1
+		buf += string(row.chars) + "\n"
+	}
+
+	return buf, totlen
+}
+
+func editorSave() {
+	if E.filename == "" {
+		return
+	}
+
+	buf, ln := editorRowsToString()
+
+	fd, err := os.Open(E.filename)
+	if err != nil {
+		editorSetStatusMessage("Can't save! File open error: %s", err)
+		return
+	}
+	defer fd.Close()
+
+	n, err := io.WriteString(fd, buf)
+	if err == nil {
+		if n == ln {
+			editorSetStatusMessage(fmt.Sprintf("Wrote %d bytes to %s", ln, E.filename))
+		} else {
+			editorSetStatusMessage(fmt.Sprintf("Wanted to write %d bytes, write %d", ln, n))
+		}
+		return
+	}
+	editorSetStatusMessage("Couldn't save file to disk. Err: %s", err)
+}
+
 /*** input ***/
 
 func editorProcessKeyPress() {
 	ch := editorReadKey()
 	switch ch {
+	case '\r':
+		break
 	case CONTROL_KEY('q'):
 		os.Stdout.Write([]byte("\x1b[2J")) // clear screen
 		os.Stdout.Write([]byte("\x1b[3J")) // clear scrollback history
@@ -264,6 +306,13 @@ func editorProcessKeyPress() {
 		E.cursor_x = 0
 	case END_KEY:
 		E.cursor_x = E.screencols - 1
+
+	case CONTROL_KEY('s'):
+		editorSave()
+
+	case BACKSPACE, CONTROL_KEY('h'), DEL_KEY:
+		break
+
 	case PAGE_DOWN, PAGE_UP:
 		for times := E.screenrows; times > 0; times-- {
 			if ch == PAGE_UP {
@@ -272,6 +321,9 @@ func editorProcessKeyPress() {
 				editorMoveCursor(ARROW_DOWN)
 			}
 		}
+	case CONTROL_KEY('l'), '\x1b':
+		break
+
 	default:
 		editorInsertChar(byte(ch))
 	}
