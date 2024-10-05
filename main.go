@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"time"
+	"unicode"
 
 	"golang.org/x/term"
 )
@@ -353,7 +354,11 @@ func editorRowsToString() (string, int) {
 
 func editorSave() {
 	if E.filename == "" {
-		return
+		E.filename = editorPrompt("Save as: %s (ESC to cancel)")
+		if E.filename == "" {
+			editorSetStatusMessage("Save aborted")
+			return
+		}
 	}
 
 	buf, ln := editorRowsToString()
@@ -377,6 +382,36 @@ func editorSave() {
 /*** input ***/
 
 var quitTimes int = GODITOR_QUIT_TIMES
+
+func editorPrompt(prompt string) string {
+	var buf []byte
+
+	for {
+		editorSetStatusMessage(prompt, buf)
+		editorRefreshScreen()
+
+		c := editorReadKey()
+		if c == DEL_KEY || c == CONTROL_KEY('h') || c == BACKSPACE {
+			if len(buf) != 0 {
+				buf = buf[:len(buf)-1]
+			}
+		} else if c == '\x1b' {
+			editorSetStatusMessage("")
+			return ""
+		} else if c == '\r' {
+			if len(buf) != 0 {
+				editorSetStatusMessage("")
+				return string(buf)
+			}
+		} else {
+			if unicode.IsPrint(rune(c)) {
+				buf = append(buf, byte(c))
+			}
+		}
+
+	}
+
+}
 
 func editorProcessKeyPress() {
 	ch := editorReadKey()
