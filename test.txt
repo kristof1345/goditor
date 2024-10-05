@@ -4,11 +4,18 @@ ummsss
 y text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum.
 m Ipsum is simply dummy tdddsdffsdfext of the printing and typesetting industry. Lorem Ipsum has been the industry's sta
 dndard- test s see what happens: this is what happens
-
+
  dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essent
  ially u - tddhis is another tst , fuck edddrr fuuuuck delete isn't workinggggg
 
 hanged. It was popularised in the 19sdlfkjsdklfj sdj fs sdfk jsdfk j sdk j sdkfjsdfkj jjjsdf jjj of Letraset sheets containing Lorem Ipsum passages, and more recently with desk
+
+func editorConfig() {
+     skdfjsd
+     
+     dkdfjdkf
+}
+
 top publis
 
 
@@ -21,3 +28,70 @@ hing software like Aldus PageMaker including versions of Lorem Ipsum.
 dddd
 dddd
 dddssssddd
+dd
+ddd
+d
+d
+d
+d
+d
+d
+d
+d
+d
+d
+d
+d
+d
+d
+d
+dd
+d
+d
+d
+d
+d
+d
+d
+d
+d
+d
+d
+
+dd
+d
+d
+
+d
+d
+dd
+d
+
+
+
+
+
+ddd
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+func editorFundText() {
+var gor erow = fmt.Sprintf("sldfkjl")
+}
+
+
+
+

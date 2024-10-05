@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"time"
 	"unicode"
 
@@ -145,17 +146,22 @@ func die(str string) {
 
 /*** row operations ***/
 
-func editorRowCxToRx(row *erow, cx int) int {
-	rx := 0
+func editorRowCxToRx(row *erow, rx int) int {
+	cur_rx := 0
+	cx := 0
 
-	for i := 0; i < cx; i++ {
-		if row.chars[i] == '\t' {
-			rx += (GODITOR_TAB_STOP - 1) - (rx % GODITOR_TAB_STOP)
+	for cx = 0; cx < row.size; cx++ {
+		if row.chars[cx] == '\t' {
+			cur_rx += (GODITOR_TAB_STOP - 1) - (cur_rx % GODITOR_TAB_STOP)
 		}
-		rx += 1
+		cur_rx += 1
+
+		if cur_rx > rx {
+			return cx
+		}
 	}
 
-	return rx
+	return cx
 }
 
 func editorUpdateRow(row *erow) {
@@ -314,6 +320,40 @@ func editorDelChar() {
 	}
 }
 
+/*** find ***/
+
+func editorFindCallback(query []byte, key int) {
+	if key == '\r' || key == '\x1b' {
+		return
+	}
+
+	for i := 0; i < E.numrows; i++ {
+		var row *erow = &E.rows[i]
+		if strings.Contains(string(row.render), string(query)) {
+			E.cursor_y = i
+			E.cursor_x = editorRowCxToRx(row, strings.Index(string(row.render), string(query)))
+			E.rowoff = E.numrows
+			break
+		}
+	}
+}
+
+func editorFind() {
+	saved_cx := E.cursor_x
+	saved_cy := E.cursor_y
+	saved_rowoff := E.rowoff
+	saved_coloff := E.rowoff
+
+	query := editorPrompt("Search: %s (ESC to cancel)", editorFindCallback)
+
+	if query == "" {
+		E.cursor_x = saved_cx
+		E.cursor_y = saved_cy
+		E.rowoff = saved_rowoff
+		E.coloff = saved_coloff
+	}
+}
+
 /*** file ***/
 
 func editorOpen(filename string) {
@@ -354,7 +394,7 @@ func editorRowsToString() (string, int) {
 
 func editorSave() {
 	if E.filename == "" {
-		E.filename = editorPrompt("Save as: %s (ESC to cancel)")
+		E.filename = editorPrompt("Save as: %s (ESC to cancel)", nil)
 		if E.filename == "" {
 			editorSetStatusMessage("Save aborted")
 			return
@@ -383,7 +423,7 @@ func editorSave() {
 
 var quitTimes int = GODITOR_QUIT_TIMES
 
-func editorPrompt(prompt string) string {
+func editorPrompt(prompt string, callback func([]byte, int)) string {
 	var buf []byte
 
 	for {
@@ -397,10 +437,16 @@ func editorPrompt(prompt string) string {
 			}
 		} else if c == '\x1b' {
 			editorSetStatusMessage("")
+			if callback != nil {
+				callback(buf, c)
+			}
 			return ""
 		} else if c == '\r' {
 			if len(buf) != 0 {
 				editorSetStatusMessage("")
+				if callback != nil {
+					callback(buf, c)
+				}
 				return string(buf)
 			}
 		} else {
@@ -409,6 +455,9 @@ func editorPrompt(prompt string) string {
 			}
 		}
 
+		if callback != nil {
+			callback(buf, c)
+		}
 	}
 
 }
@@ -436,6 +485,10 @@ func editorProcessKeyPress() {
 		E.cursor_x = 0
 	case END_KEY:
 		E.cursor_x = E.screencols - 1
+
+	case CONTROL_KEY('f'):
+		editorFind()
+		break
 
 	case CONTROL_KEY('s'):
 		editorSave()
@@ -728,7 +781,7 @@ func main() {
 		editorOpen(os.Args[1])
 	}
 
-	editorSetStatusMessage("HELP: CTRL-S = save | CTRL-Q = quit")
+	editorSetStatusMessage("HELP: CTRL-S = save | CTRL-F = find | CTRL-Q = quit")
 
 	for {
 		editorRefreshScreen()
