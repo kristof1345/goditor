@@ -24,12 +24,11 @@ func CONTROL_KEY(key byte) int {
 /*** data ***/
 
 type erow struct {
-	rsize         int
-	size          int
-	render        []byte
-	chars         []byte
-	hl            []byte
-	hlOpenComment bool
+	rsize  int
+	size   int
+	render []byte
+	chars  []byte
+	hl     []byte
 }
 
 type EditorConfig struct {
@@ -62,6 +61,11 @@ const (
 	END_KEY
 	PAGE_UP
 	PAGE_DOWN
+)
+
+const (
+	HL_NORMAL = 0
+	HL_NUMBER = iota
 )
 
 /*** terminal ***/
@@ -191,6 +195,8 @@ func editorUpdateRow(row *erow) {
 
 	// row.render[idx] = '\n'
 	row.rsize = idx
+
+	editorUpdateSyntax(row)
 }
 
 func editorInsertRow(at int, s []byte) {
@@ -667,15 +673,27 @@ func editorDrawRows(bbuf *bytes.Buffer) {
 				}
 				rindex := E.coloff + length
 
-				for _, c := range E.rows[filerow].render[E.coloff:rindex] {
-					if unicode.IsDigit(rune(c)) { // check for digit and color it
-						bbuf.WriteString("\x1b[31m")
+				hl := E.rows[filerow].hl[E.coloff:rindex]
+				currentColor := -1
+
+				for j, c := range E.rows[filerow].render[E.coloff:rindex] {
+					if hl[j] == HL_NORMAL {
+						if currentColor != -1 {
+							bbuf.WriteString("\x1b[39m")
+							currentColor = -1
+						}
 						bbuf.WriteByte(c)
-						bbuf.WriteString("\x1b[39m")
 					} else {
+						color := editorSyntaxToColor(hl[j])
+						if color != currentColor {
+							currentColor = color
+							buf := fmt.Sprintf("\x1b[%dm", color)
+							bbuf.WriteString(buf)
+						}
 						bbuf.WriteByte(c)
 					}
 				}
+				bbuf.WriteString("\x1b[39m")
 			}
 		}
 
@@ -766,6 +784,25 @@ func editorRefreshScreen() {
 func editorSetStatusMessage(args ...interface{}) {
 	E.statusmsg = fmt.Sprintf(args[0].(string), args[1:]...)
 	E.statusmsg_time = time.Now()
+}
+
+/*** syntax highlighting ***/
+
+func editorUpdateSyntax(row *erow) {
+	for i, ch := range row.render {
+		if unicode.IsDigit(rune(ch)) {
+			row.hl[i] = HL_NUMBER
+		}
+	}
+}
+
+func editorSyntaxToColor(hl byte) int {
+	switch hl {
+	case HL_NUMBER:
+		return 31
+	default:
+		return 37
+	}
 }
 
 /*** init ***/
