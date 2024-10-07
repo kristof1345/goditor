@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strings"
+	// "strings"
 	"time"
-	"unicode"
+	// "unicode"
 
 	"golang.org/x/term"
 )
@@ -25,10 +25,12 @@ func CONTROL_KEY(key byte) int {
 /*** data ***/
 
 type erow struct {
-	rsize  int
-	size   int
-	render []byte
-	chars  []byte
+	rsize         int
+	size          int
+	render        []byte
+	chars         []byte
+	hl            []byte
+	hlOpenComment bool
 }
 
 type EditorConfig struct {
@@ -325,7 +327,7 @@ func editorDelChar() {
 var lastMatch int = -1
 var direction int = 1
 
-func editorFindCallback(query []byte, key int) {
+func editorFindCallback(qry []byte, key int) {
 	if key == '\r' || key == '\x1b' {
 		lastMatch = -1
 		direction = 1
@@ -339,11 +341,25 @@ func editorFindCallback(query []byte, key int) {
 		direction = 1
 	}
 
-	for i := 0; i < E.numrows; i++ {
-		var row *erow = &E.rows[i]
-		if strings.Contains(string(row.render), string(query)) {
-			E.cursor_y = i
-			E.cursor_x = editorRowCxToRx(row, strings.Index(string(row.render), string(query)))
+	if lastMatch == -1 {
+		direction = 1
+	}
+	current := lastMatch
+
+	for _ = range E.rows {
+		current += direction
+		if current == -1 {
+			current = E.numrows - 1
+		} else if current == E.numrows {
+			current = 0
+		}
+		row := &E.rows[current]
+
+		x := bytes.Index(row.render, qry)
+		if x > -1 {
+			lastMatch = current
+			E.cursor_y = current
+			E.cursor_x = editorRowCxToRx(row, x)
 			E.rowoff = E.numrows
 			break
 		}
@@ -356,7 +372,7 @@ func editorFind() {
 	saved_rowoff := E.rowoff
 	saved_coloff := E.rowoff
 
-	query := editorPrompt("Search: %s (ESC to cancel)", editorFindCallback)
+	query := editorPrompt("Search: %s (Use/ESC/Arrows/Enter)", editorFindCallback)
 
 	if query == "" {
 		E.cursor_x = saved_cx
@@ -462,7 +478,7 @@ func editorPrompt(prompt string, callback func([]byte, int)) string {
 				return string(buf)
 			}
 		} else {
-			if unicode.IsPrint(rune(c)) {
+			if c < 128 { // this might let some characters through that we don't want, but for now it works. The previous version didn't ignore arrow keys
 				buf = append(buf, byte(c))
 			}
 		}
