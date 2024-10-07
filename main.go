@@ -6,9 +6,8 @@ import (
 	"fmt"
 	"io"
 	"os"
-	// "strings"
 	"time"
-	// "unicode"
+	"unicode"
 
 	"golang.org/x/term"
 )
@@ -49,8 +48,7 @@ type EditorConfig struct {
 
 var (
 	terminalState *term.State
-	// bbuf    = bytes.Buffer{}
-	E = EditorConfig{}
+	E             = EditorConfig{}
 )
 
 const (
@@ -73,7 +71,6 @@ func enableRawMode() {
 	terminalState = oldState
 
 	if err != nil {
-		// restore and kill
 		die(err.Error())
 	}
 }
@@ -614,22 +611,11 @@ func editorMoveCursor(key int) {
 	if E.cursor_x > rowlen {
 		E.cursor_x = rowlen
 	}
-
-	// stuff from go-GODITOR
-	// rowlen := 0
-	// if E.cursor_y < E.numrows {
-	// 	rowlen = E.rows[E.cursor_y].size
-	// }
-	// if E.cursor_x > rowlen {
-	// 	E.cursor_x = rowlen
-	// }
 }
 
 /*** output ***/
 
 func editorScroll() {
-	// E.rx = E.cursor_x
-
 	E.rx = 0
 	if E.cursor_y < E.numrows {
 		E.rx = editorRowCxToRx(&E.rows[E.cursor_y], E.cursor_x)
@@ -682,7 +668,13 @@ func editorDrawRows(bbuf *bytes.Buffer) {
 				rindex := E.coloff + length
 
 				for _, c := range E.rows[filerow].render[E.coloff:rindex] {
-					bbuf.WriteByte(c)
+					if unicode.IsDigit(rune(c)) { // check for digit and color it
+						bbuf.WriteString("\x1b[31m")
+						bbuf.WriteByte(c)
+						bbuf.WriteString("\x1b[39m")
+					} else {
+						bbuf.WriteByte(c)
+					}
 				}
 			}
 		}
@@ -758,7 +750,6 @@ func editorRefreshScreen() {
 	editorDrawStatusBar(&bbuf)
 	editorDrawMessageBar(&bbuf)
 
-	// bbuf.WriteString("\x1b[H")
 	bbuf.WriteString(
 		fmt.Sprintf(
 			"\x1b[%d;%dH",
@@ -780,7 +771,6 @@ func editorSetStatusMessage(args ...interface{}) {
 /*** init ***/
 
 func initEditor() {
-	// get window size
 	width, height, err := term.GetSize(int(os.Stdout.Fd()))
 	if err != nil {
 		die(err.Error() + " init")
