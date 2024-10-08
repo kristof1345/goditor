@@ -150,27 +150,38 @@ func die(str string) {
 
 /*** row operations ***/
 
-// func editorRowCxToRx(row *erow, rx int) int {
-// 	cur_rx := 0
-// 	cx := 0
-//
-// 	for cx = 0; cx < row.size; cx++ {
-// 		if row.chars[cx] == '\t' {
-// 			cur_rx += (GODITOR_TAB_STOP - 1) - (cur_rx % GODITOR_TAB_STOP)
-// 		}
-// 		cur_rx += 1
-//
-// 		if cur_rx > rx {
-// 			return cx
-// 		}
-// 	}
-//
-// 	return cx
-// }
-
 // implement these
-func editorRowCxToRx(row *erow, cx int) int {}
-func editorRowRxToCx(row *erow, rx int) int {}
+func editorRowCxToRx(row *erow, cx int) int {
+	rx := 0
+
+	for i := 0; i < cx; i++ {
+		if row.chars[i] == '\t' {
+			rx += (GODITOR_TAB_STOP - 1) - (rx % GODITOR_TAB_STOP)
+		}
+
+		rx++
+	}
+
+	return rx
+}
+
+func editorRowRxToCx(row *erow, rx int) int {
+	cur_rx := 0
+	cx := 0
+
+	for cx = 0; cx < row.size; cx++ {
+		if row.chars[cx] == '\t' {
+			cur_rx += (GODITOR_TAB_STOP - 1) - (cur_rx % GODITOR_TAB_STOP)
+		}
+
+		cur_rx++
+		if cur_rx > rx {
+			return cx
+		}
+	}
+
+	return cx
+}
 
 func editorUpdateRow(row *erow) {
 	tabs := 0
@@ -198,9 +209,7 @@ func editorUpdateRow(row *erow) {
 		}
 	}
 
-	// row.render[idx] = '\n'
 	row.rsize = idx
-
 	editorUpdateSyntax(row)
 }
 
@@ -211,10 +220,6 @@ func editorInsertRow(at int, s []byte) {
 	var r erow
 	r.chars = s
 	r.size = len(s)
-	// r := erow{
-	// 	size:  len(line),
-	// 	chars: line,
-	// }
 
 	if at == 0 {
 		t := make([]erow, 1)
@@ -226,12 +231,11 @@ func editorInsertRow(at int, s []byte) {
 		t := make([]erow, 1)
 		t[0] = r
 		E.rows = append(E.rows[:at], append(t, E.rows[at:]...)...)
+		E.dirty = true
 	}
 
 	editorUpdateRow(&E.rows[at])
-	// E.rows = append(E.rows, r)
 	E.numrows += 1
-	E.dirty = true
 }
 
 func editorDelRow(at int) {
@@ -241,9 +245,6 @@ func editorDelRow(at int) {
 	E.rows = append(E.rows[:at], E.rows[at+1:]...)
 	E.dirty = true
 	E.numrows--
-	// for j := at; j < E.numrows; j++ {
-	// E.rows[j].idx
-	// }
 }
 
 func editorRowInsertChar(row *erow, at int, c byte) {
@@ -287,6 +288,7 @@ func editorInsertChar(c byte) {
 	if E.cursor_y == E.numrows {
 		var emptyRow []byte
 		editorInsertRow(E.numrows, emptyRow)
+		E.dirty = true
 	}
 
 	editorRowInsertChar(&E.rows[E.cursor_y], E.cursor_x, c)
@@ -297,6 +299,7 @@ func editorInsertChar(c byte) {
 func editorInsertNewLine() {
 	if E.cursor_x == 0 {
 		editorInsertRow(E.cursor_y, make([]byte, 0))
+		E.dirty = true
 	} else {
 		editorInsertRow(E.cursor_y+1, E.rows[E.cursor_y].chars[E.cursor_x:])
 		E.rows[E.cursor_y].chars = E.rows[E.cursor_y].chars[:E.cursor_x]
@@ -576,25 +579,7 @@ func editorMoveCursor(key int) {
 			E.cursor_y--
 			E.cursor_x = E.rows[E.cursor_y].size
 		}
-		// stuff from go-GODITOR
-		// if E.cursor_x != 0 {
-		// 	E.cursor_x--
-		// } else if E.cursor_y > 0 {
-		// 	E.cursor_y--
-		// 	E.cursor_x = E.rows[E.cursor_y].size
-		// }
 	case ARROW_RIGHT:
-		// this is the stuff from go-GODITOR
-		// if E.cursor_y < E.numrows {
-		// 	if E.cursor_x < E.rows[E.cursor_y].size {
-		// 		E.cursor_x++
-		// 	} else if E.cursor_x == E.rows[E.cursor_y].size {
-		// 		E.cursor_x = 0
-		// 		E.cursor_y++
-		// 	}
-		// }
-
-		// this is from the tutorial
 		if row != nil && E.cursor_x < row.size {
 			E.cursor_x++
 		} else if row != nil && E.cursor_x == row.size {
