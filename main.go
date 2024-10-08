@@ -66,6 +66,7 @@ const (
 const (
 	HL_NORMAL = 0
 	HL_NUMBER = iota
+	HL_MATCH  = iota
 )
 
 /*** terminal ***/
@@ -149,23 +150,27 @@ func die(str string) {
 
 /*** row operations ***/
 
-func editorRowCxToRx(row *erow, rx int) int {
-	cur_rx := 0
-	cx := 0
+// func editorRowCxToRx(row *erow, rx int) int {
+// 	cur_rx := 0
+// 	cx := 0
+//
+// 	for cx = 0; cx < row.size; cx++ {
+// 		if row.chars[cx] == '\t' {
+// 			cur_rx += (GODITOR_TAB_STOP - 1) - (cur_rx % GODITOR_TAB_STOP)
+// 		}
+// 		cur_rx += 1
+//
+// 		if cur_rx > rx {
+// 			return cx
+// 		}
+// 	}
+//
+// 	return cx
+// }
 
-	for cx = 0; cx < row.size; cx++ {
-		if row.chars[cx] == '\t' {
-			cur_rx += (GODITOR_TAB_STOP - 1) - (cur_rx % GODITOR_TAB_STOP)
-		}
-		cur_rx += 1
-
-		if cur_rx > rx {
-			return cx
-		}
-	}
-
-	return cx
-}
+// implement these
+func editorRowCxToRx(row *erow, cx int) int {}
+func editorRowRxToCx(row *erow, rx int) int {}
 
 func editorUpdateRow(row *erow) {
 	tabs := 0
@@ -362,8 +367,13 @@ func editorFindCallback(qry []byte, key int) {
 		if x > -1 {
 			lastMatch = current
 			E.cursor_y = current
-			E.cursor_x = editorRowCxToRx(row, x)
+			E.cursor_x = editorRowRxToCx(row, x)
 			E.rowoff = E.numrows
+
+			max := x + len(qry)
+			for i := x; i < max; i++ {
+				row.hl[i] = HL_MATCH
+			}
 			break
 		}
 	}
@@ -789,6 +799,8 @@ func editorSetStatusMessage(args ...interface{}) {
 /*** syntax highlighting ***/
 
 func editorUpdateSyntax(row *erow) {
+	row.hl = make([]byte, row.rsize)
+
 	for i, ch := range row.render {
 		if unicode.IsDigit(rune(ch)) {
 			row.hl[i] = HL_NUMBER
@@ -800,6 +812,8 @@ func editorSyntaxToColor(hl byte) int {
 	switch hl {
 	case HL_NUMBER:
 		return 31
+	case HL_MATCH:
+		return 34
 	default:
 		return 37
 	}
