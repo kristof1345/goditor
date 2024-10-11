@@ -46,12 +46,6 @@ type EditorConfig struct {
 	mode                   byte
 }
 
-// type EditorSyntax struct {
-// 	filetype  string
-// 	filematch []string
-// 	flags     int
-// }
-
 var (
 	terminalState *term.State
 	E             = EditorConfig{}
@@ -842,45 +836,8 @@ func editorSetStatusMessage(args ...interface{}) {
 
 /*** syntax highlighting ***/
 
-// var separators []byte = []byte(",.()+-/*=~%<>[]; \t\n\r")
-//
-// func isSeparator(c byte) bool {
-// 	if bytes.IndexByte(separators, byte(c)) >= 0 {
-// 		return true
-// 	}
-//
-// 	return false
-// }
-
-// func editorUpdateSyntax(row *erow) {
-// 	row.hl = make([]byte, row.rsize)
-//
-// 	prevSep := true
-//
-// 	for i, ch := range row.render {
-// 		var prevHl byte = HL_NORMAL
-// 		if i > 0 {
-// 			prevHl = row.hl[i-1]
-// 		}
-//
-// 		if (unicode.IsDigit(rune(ch)) && (prevSep || prevHl == HL_NUMBER)) || (ch == '.' && prevHl == HL_NUMBER) {
-// 			row.hl[i] = HL_NUMBER
-// 			prevSep = false
-// 			continue
-// 		}
-//
-// 		prevSep = isSeparator(ch)
-// 	}
-// }
-
 func editorUpdateSyntax(row *erow) {
 	row.hl = make([]byte, row.rsize)
-
-	// for i, ch := range row.render {
-	// 	if unicode.IsDigit(rune(ch)) {
-	// 		row.hl[i] = HL_NORMAL
-	// 	}
-	// }
 }
 
 func editorSyntaxToColor(hl byte) int {
