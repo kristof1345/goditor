@@ -43,6 +43,7 @@ type EditorConfig struct {
 	statusmsg              string
 	statusmsg_time         time.Time
 	dirty                  bool
+	mode                   byte
 }
 
 // type EditorSyntax struct {
@@ -73,6 +74,11 @@ const (
 	HL_NORMAL = 0
 	HL_NUMBER = iota
 	HL_MATCH  = iota
+)
+
+const (
+	NORMAL = 'N'
+	INSERT = 'I'
 )
 
 const (
@@ -532,8 +538,12 @@ func editorProcessKeyPress() {
 	ch := editorReadKey()
 	switch ch {
 	case '\r':
-		editorInsertNewLine()
-		break
+		if E.mode == INSERT {
+			editorInsertNewLine()
+			break
+		}
+	case 'i':
+		E.mode = INSERT
 	case CONTROL_KEY('q'):
 		if E.dirty && quitTimes > 0 {
 			editorSetStatusMessage(fmt.Sprintf("Warning! File has unsaved changes. Press CTRL-Q %d more times to quit.", quitTimes))
@@ -560,11 +570,13 @@ func editorProcessKeyPress() {
 		editorSave()
 
 	case BACKSPACE, CONTROL_KEY('h'), DEL_KEY:
-		if ch == DEL_KEY {
-			editorMoveCursor(ARROW_RIGHT)
+		if E.mode == INSERT {
+			if ch == DEL_KEY {
+				editorMoveCursor(ARROW_RIGHT)
+			}
+			editorDelChar()
+			break
 		}
-		editorDelChar()
-		break
 
 	case PAGE_DOWN, PAGE_UP:
 		for times := E.screenrows; times > 0; times-- {
@@ -575,10 +587,15 @@ func editorProcessKeyPress() {
 			}
 		}
 	case CONTROL_KEY('l'), '\x1b':
+		if E.mode != NORMAL {
+			E.mode = NORMAL
+		}
 		break
 
 	default:
-		editorInsertChar(byte(ch))
+		if E.mode == INSERT {
+			editorInsertChar(byte(ch))
+		}
 	}
 
 	quitTimes = GODITOR_QUIT_TIMES
@@ -731,9 +748,9 @@ func editorDrawStatusBar(bbuf *bytes.Buffer) {
 
 	status := ""
 	if E.dirty {
-		status = fmt.Sprintf("%s(modified) - %d lines", truncFilename, E.numrows)
+		status = fmt.Sprintf("%s(modified) - %d lines - %s", truncFilename, E.numrows, string(E.mode))
 	} else {
-		status = fmt.Sprintf("%s - %d lines", truncFilename, E.numrows)
+		status = fmt.Sprintf("%s - %d lines - %s", truncFilename, E.numrows, string(E.mode))
 	}
 
 	rstatus := fmt.Sprintf("%d/%d", E.cursor_y+1, E.numrows)
@@ -876,6 +893,7 @@ func initEditor() {
 	E.filename = ""
 	E.statusmsg = ""
 	E.dirty = false
+	E.mode = NORMAL
 
 	E.screenrows -= 2
 }
