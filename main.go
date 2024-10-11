@@ -7,7 +7,7 @@ import (
 	"io"
 	"os"
 	"time"
-	"unicode"
+	// "unicode"
 
 	"golang.org/x/term"
 )
@@ -45,6 +45,12 @@ type EditorConfig struct {
 	dirty                  bool
 }
 
+// type EditorSyntax struct {
+// 	filetype  string
+// 	filematch []string
+// 	flags     int
+// }
+
 var (
 	terminalState *term.State
 	E             = EditorConfig{}
@@ -67,6 +73,10 @@ const (
 	HL_NORMAL = 0
 	HL_NUMBER = iota
 	HL_MATCH  = iota
+)
+
+const (
+	HL_HIGHLIGHT_NUMBERS = 1 << 0
 )
 
 /*** terminal ***/
@@ -337,8 +347,16 @@ func editorDelChar() {
 
 var lastMatch int = -1
 var direction int = 1
+var savedHlLine int
+var savedHl []byte
 
 func editorFindCallback(qry []byte, key int) {
+	if savedHlLine > 0 {
+		copy(E.rows[savedHlLine].hl, savedHl)
+		savedHl = nil
+		savedHlLine = 0
+	}
+
 	if key == '\r' || key == '\x1b' {
 		lastMatch = -1
 		direction = 1
@@ -372,6 +390,10 @@ func editorFindCallback(qry []byte, key int) {
 			E.cursor_y = current
 			E.cursor_x = editorRowRxToCx(row, x)
 			E.rowoff = E.numrows
+
+			savedHl = make([]byte, row.rsize)
+			copy(savedHl, row.hl)
+			savedHlLine = current
 
 			max := x + len(qry)
 			for i := x; i < max; i++ {
@@ -783,14 +805,45 @@ func editorSetStatusMessage(args ...interface{}) {
 
 /*** syntax highlighting ***/
 
+// var separators []byte = []byte(",.()+-/*=~%<>[]; \t\n\r")
+//
+// func isSeparator(c byte) bool {
+// 	if bytes.IndexByte(separators, byte(c)) >= 0 {
+// 		return true
+// 	}
+//
+// 	return false
+// }
+
+// func editorUpdateSyntax(row *erow) {
+// 	row.hl = make([]byte, row.rsize)
+//
+// 	prevSep := true
+//
+// 	for i, ch := range row.render {
+// 		var prevHl byte = HL_NORMAL
+// 		if i > 0 {
+// 			prevHl = row.hl[i-1]
+// 		}
+//
+// 		if (unicode.IsDigit(rune(ch)) && (prevSep || prevHl == HL_NUMBER)) || (ch == '.' && prevHl == HL_NUMBER) {
+// 			row.hl[i] = HL_NUMBER
+// 			prevSep = false
+// 			continue
+// 		}
+//
+// 		prevSep = isSeparator(ch)
+// 	}
+// }
+
 func editorUpdateSyntax(row *erow) {
 	row.hl = make([]byte, row.rsize)
 
-	for i, ch := range row.render {
-		if unicode.IsDigit(rune(ch)) {
-			row.hl[i] = HL_NUMBER
-		}
-	}
+	// for i, ch := range row.render {
+	// 	if unicode.IsDigit(rune(ch)) {
+	// 		row.hl[i] = HL_NORMAL
+	// 	}
+	// }
 }
 
 func editorSyntaxToColor(hl byte) int {
