@@ -79,6 +79,11 @@ const (
 const (
 	NORMAL = 'N'
 	INSERT = 'I'
+
+	LEFT  = 104
+	DOWN  = 106
+	UP    = 107
+	RIGHT = 108
 )
 
 const (
@@ -534,6 +539,8 @@ func editorPrompt(prompt string, callback func([]byte, int)) string {
 
 }
 
+var prevKey byte
+
 func editorProcessKeyPress() {
 	ch := editorReadKey()
 	switch ch {
@@ -557,6 +564,18 @@ func editorProcessKeyPress() {
 		os.Exit(0)
 	case ARROW_DOWN, ARROW_LEFT, ARROW_RIGHT, ARROW_UP:
 		editorMoveCursor(ch)
+	case 'h', 'j', 'k', 'l':
+		if E.mode == NORMAL {
+			editorMoveCursor(int(ch))
+		} else if E.mode == INSERT {
+			if prevKey == 'j' && byte(ch) == 'k' {
+				editorDelChar()
+				E.mode = NORMAL
+			} else {
+				prevKey = byte(ch)
+				editorInsertChar(byte(ch))
+			}
+		}
 	case HOME_KEY:
 		E.cursor_x = 0
 	case END_KEY:
@@ -594,6 +613,7 @@ func editorProcessKeyPress() {
 
 	default:
 		if E.mode == INSERT {
+			prevKey = byte(ch)
 			editorInsertChar(byte(ch))
 		}
 	}
@@ -611,25 +631,25 @@ func editorMoveCursor(key int) {
 	}
 
 	switch key {
-	case ARROW_LEFT:
+	case ARROW_LEFT, LEFT:
 		if E.cursor_x != 0 {
 			E.cursor_x--
 		} else if E.cursor_y > 0 {
 			E.cursor_y--
 			E.cursor_x = E.rows[E.cursor_y].size
 		}
-	case ARROW_RIGHT:
+	case ARROW_RIGHT, RIGHT:
 		if row != nil && E.cursor_x < row.size {
 			E.cursor_x++
 		} else if row != nil && E.cursor_x == row.size {
 			E.cursor_y++
 			E.cursor_x = 0
 		}
-	case ARROW_UP:
+	case ARROW_UP, UP:
 		if E.cursor_y != 0 {
 			E.cursor_y--
 		}
-	case ARROW_DOWN:
+	case ARROW_DOWN, DOWN:
 		if E.cursor_y < E.numrows {
 			E.cursor_y++
 		}
