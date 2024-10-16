@@ -16,6 +16,7 @@ func CONTROL_KEY(key byte) byte {
 }
 
 type EditorConfig struct {
+	cx, cy                 int
 	screenrows, screencols int
 }
 
@@ -42,12 +43,52 @@ func enableRawMode() {
 	}
 }
 
+func editorMoveCursor(c byte) {
+	switch c {
+	case 'w':
+		E.cy--
+		break
+	case 's':
+		E.cy++
+		break
+	case 'a':
+		E.cx--
+		break
+	case 'd':
+		E.cx++
+		break
+	}
+
+}
+
 func editorReadKey() byte {
-	b := make([]byte, 1)
+	b := make([]byte, 4)
 
-	os.Stdin.Read(b)
+	_, err := os.Stdin.Read(b)
+	if err != nil {
+		die("reading key press")
+	}
 
-	return b[0]
+	if b[0] == '\x1b' {
+		if b[1] == '[' {
+			switch b[2] {
+			case 'A':
+				return 'w'
+			case 'B':
+				return 's'
+			case 'C':
+				return 'd'
+			case 'D':
+				return 'a'
+			}
+		}
+
+		return '\x1b'
+	} else {
+		return b[0]
+	}
+
+	// return b[0]
 }
 
 func editorProcessKeyPress() {
@@ -59,8 +100,9 @@ func editorProcessKeyPress() {
 		os.Stdout.Write([]byte("\x1b[H"))
 		term.Restore(int(os.Stdout.Fd()), terminalState)
 		os.Exit(0)
-	default:
-		fmt.Println(string(c) + " was pressed")
+	case 'w', 'a', 's', 'd':
+		editorMoveCursor(c)
+		break
 	}
 }
 
@@ -82,7 +124,7 @@ func editorDrawRows(abuf *bytes.Buffer) {
 		}
 
 		abuf.WriteString("\x1b[K")
-		if y < E.screenrows {
+		if y < E.screenrows-1 {
 			abuf.WriteString("\n")
 		}
 	}
@@ -90,14 +132,17 @@ func editorDrawRows(abuf *bytes.Buffer) {
 
 func editorRefreshScreen() {
 	abuf := bytes.Buffer{}
+	abuf.Reset()
 
 	abuf.WriteString("\x1b[?25l")
+	abuf.WriteString("\x1b[3J")
 	// abuf.WriteString("\x1b[2J")
 	abuf.WriteString("\x1b[H")
 
 	editorDrawRows(&abuf)
 
-	abuf.WriteString("\x1b[H")
+	// abuf.WriteString("\x1b[H")
+	abuf.WriteString(fmt.Sprintf("\x1b[%d;%dH", E.cy+1, E.cx+1))
 	abuf.WriteString("\x1b[?25h")
 
 	os.Stdout.Write(abuf.Bytes())
@@ -111,7 +156,8 @@ func initEditor() {
 
 	E.screencols = width
 	E.screenrows = height
-
+	E.cx = 0
+	E.cy = 0
 }
 
 func main() {
