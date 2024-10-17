@@ -11,9 +11,16 @@ import (
 
 var GODITOR_VERSION string = "0.0.1"
 
-func CONTROL_KEY(key byte) byte {
-	return key & 0x1f
+func CONTROL_KEY(key byte) int {
+	return int(key & 0x1f)
 }
+
+const (
+	ARROW_LEFT = 1000 + iota
+	ARROW_RIGHT
+	ARROW_UP
+	ARROW_DOWN
+)
 
 type EditorConfig struct {
 	cx, cy                 int
@@ -43,25 +50,37 @@ func enableRawMode() {
 	}
 }
 
-func editorMoveCursor(c byte) {
+func editorMoveCursor(c int) {
 	switch c {
-	case 'w':
+	case ARROW_UP:
+		if E.cy == 0 {
+			break
+		}
 		E.cy--
 		break
-	case 's':
+	case ARROW_DOWN:
+		if E.cy == E.screenrows-1 {
+			break
+		}
 		E.cy++
 		break
-	case 'a':
+	case ARROW_LEFT:
+		if E.cx == 0 {
+			break
+		}
 		E.cx--
 		break
-	case 'd':
+	case ARROW_RIGHT:
+		if E.cx == E.screencols-1 {
+			break
+		}
 		E.cx++
 		break
 	}
 
 }
 
-func editorReadKey() byte {
+func editorReadKey() int {
 	b := make([]byte, 4)
 
 	_, err := os.Stdin.Read(b)
@@ -73,19 +92,19 @@ func editorReadKey() byte {
 		if b[1] == '[' {
 			switch b[2] {
 			case 'A':
-				return 'w'
+				return ARROW_UP
 			case 'B':
-				return 's'
+				return ARROW_DOWN
 			case 'C':
-				return 'd'
+				return ARROW_RIGHT
 			case 'D':
-				return 'a'
+				return ARROW_LEFT
 			}
 		}
 
 		return '\x1b'
 	} else {
-		return b[0]
+		return int(b[0])
 	}
 
 	// return b[0]
@@ -100,7 +119,7 @@ func editorProcessKeyPress() {
 		os.Stdout.Write([]byte("\x1b[H"))
 		term.Restore(int(os.Stdout.Fd()), terminalState)
 		os.Exit(0)
-	case 'w', 'a', 's', 'd':
+	case ARROW_UP, ARROW_DOWN, ARROW_LEFT, ARROW_RIGHT:
 		editorMoveCursor(c)
 		break
 	}
