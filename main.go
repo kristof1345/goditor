@@ -20,6 +20,8 @@ const (
 	ARROW_RIGHT
 	ARROW_UP
 	ARROW_DOWN
+	PAGE_UP
+	PAGE_DOWN
 )
 
 type EditorConfig struct {
@@ -53,28 +55,24 @@ func enableRawMode() {
 func editorMoveCursor(c int) {
 	switch c {
 	case ARROW_UP:
-		if E.cy == 0 {
-			break
+		if E.cy != 0 {
+			E.cy--
 		}
-		E.cy--
 		break
 	case ARROW_DOWN:
-		if E.cy == E.screenrows-1 {
-			break
+		if E.cy != E.screenrows-1 {
+			E.cy++
 		}
-		E.cy++
 		break
 	case ARROW_LEFT:
-		if E.cx == 0 {
-			break
+		if E.cx != 0 {
+			E.cx--
 		}
-		E.cx--
 		break
 	case ARROW_RIGHT:
-		if E.cx == E.screencols-1 {
-			break
+		if E.cx != E.screencols-1 {
+			E.cx++
 		}
-		E.cx++
 		break
 	}
 
@@ -90,15 +88,26 @@ func editorReadKey() int {
 
 	if b[0] == '\x1b' {
 		if b[1] == '[' {
-			switch b[2] {
-			case 'A':
-				return ARROW_UP
-			case 'B':
-				return ARROW_DOWN
-			case 'C':
-				return ARROW_RIGHT
-			case 'D':
-				return ARROW_LEFT
+			if b[2] >= '0' && b[2] <= '9' {
+				if b[3] == '~' {
+					switch b[2] {
+					case '5':
+						return PAGE_UP
+					case '6':
+						return PAGE_DOWN
+					}
+				}
+			} else {
+				switch b[2] {
+				case 'A':
+					return ARROW_UP
+				case 'B':
+					return ARROW_DOWN
+				case 'C':
+					return ARROW_RIGHT
+				case 'D':
+					return ARROW_LEFT
+				}
 			}
 		}
 
@@ -119,6 +128,15 @@ func editorProcessKeyPress() {
 		os.Stdout.Write([]byte("\x1b[H"))
 		term.Restore(int(os.Stdout.Fd()), terminalState)
 		os.Exit(0)
+	case PAGE_UP, PAGE_DOWN:
+		for i := 0; i < E.screenrows; i++ {
+			if c == PAGE_UP {
+				editorMoveCursor(ARROW_UP)
+			} else {
+				editorMoveCursor(ARROW_DOWN)
+			}
+		}
+		break
 	case ARROW_UP, ARROW_DOWN, ARROW_LEFT, ARROW_RIGHT:
 		editorMoveCursor(c)
 		break
