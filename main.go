@@ -22,11 +22,19 @@ const (
 	ARROW_DOWN
 	PAGE_UP
 	PAGE_DOWN
+	DEL_KEY
 )
+
+type erow struct {
+	size  int
+	chars []byte
+}
 
 type EditorConfig struct {
 	cx, cy                 int
 	screenrows, screencols int
+	numrows                int
+	row                    erow
 }
 
 var (
@@ -50,6 +58,15 @@ func enableRawMode() {
 	if err != nil {
 		die(err.Error())
 	}
+}
+
+func editorOpen() {
+	line := []byte("Hello world")
+
+	E.row.size = len(line)
+	E.row.chars = line
+	E.numrows = 1
+
 }
 
 func editorMoveCursor(c int) {
@@ -91,6 +108,8 @@ func editorReadKey() int {
 			if b[2] >= '0' && b[2] <= '9' {
 				if b[3] == '~' {
 					switch b[2] {
+					case '3':
+						return DEL_KEY
 					case '5':
 						return PAGE_UP
 					case '6':
@@ -145,19 +164,25 @@ func editorProcessKeyPress() {
 
 func editorDrawRows(abuf *bytes.Buffer) {
 	for y := 0; y < E.screenrows; y++ {
-		if y == E.screenrows/3 {
-			welcomeMessage := fmt.Sprintf("Goditor editor -- version %s", GODITOR_VERSION)
-			if len(welcomeMessage) > E.screencols {
-				welcomeMessage = welcomeMessage[:E.screencols-1]
-			}
-			padding := (E.screencols - len(welcomeMessage)) / 2
-			if padding > 0 {
-				abuf.WriteString("~" + strings.Repeat(" ", padding-1) + welcomeMessage + strings.Repeat(" ", padding))
+		if y >= E.numrows {
+			if y == E.screenrows/3 {
+				welcomeMessage := fmt.Sprintf("Goditor editor -- version %s", GODITOR_VERSION)
+				if len(welcomeMessage) > E.screencols {
+					welcomeMessage = welcomeMessage[:E.screencols-1]
+				}
+				padding := (E.screencols - len(welcomeMessage)) / 2
+				if padding > 0 {
+					abuf.WriteString("~" + strings.Repeat(" ", padding-1) + welcomeMessage + strings.Repeat(" ", padding))
+				} else {
+					abuf.WriteString("~" + welcomeMessage)
+				}
 			} else {
-				abuf.WriteString("~" + welcomeMessage)
+				abuf.WriteString("~")
 			}
 		} else {
-			abuf.WriteString("~")
+			for _, c := range E.row.chars {
+				abuf.WriteByte(c)
+			}
 		}
 
 		abuf.WriteString("\x1b[K")
@@ -195,11 +220,13 @@ func initEditor() {
 	E.screenrows = height
 	E.cx = 0
 	E.cy = 0
+	E.numrows = 0
 }
 
 func main() {
 	enableRawMode()
 	initEditor()
+	editorOpen()
 
 	for {
 		editorRefreshScreen()
