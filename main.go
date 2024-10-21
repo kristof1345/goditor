@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
 	"os"
@@ -34,7 +35,7 @@ type EditorConfig struct {
 	cx, cy                 int
 	screenrows, screencols int
 	numrows                int
-	row                    erow
+	row                    []erow
 }
 
 var (
@@ -60,13 +61,30 @@ func enableRawMode() {
 	}
 }
 
-func editorOpen() {
-	line := []byte("Hello world")
+func editorOpen(filename string) {
+	file, err := os.Open(filename)
+	if err != nil {
+		die("opening file")
+	}
+	defer file.Close()
 
-	E.row.size = len(line)
-	E.row.chars = line
-	E.numrows = 1
+	sc := bufio.NewScanner(file)
+	lineIndex := 0
+	for sc.Scan() {
+		// fix this here - fucked up array index
+		line := sc.Text()
+		E.row[lineIndex].size = len(line)
+		E.row[lineIndex].chars = append(E.row[lineIndex].chars, []byte(line)...)
+		E.numrows++
+		lineIndex++
+	}
+	if err := sc.Err(); err != nil {
+		die(fmt.Sprintf("scanning file error %v", err))
+	}
 
+	// E.row.size = len(line)
+	// E.row.chars = line
+	// E.numrows = 1
 }
 
 func editorMoveCursor(c int) {
@@ -165,7 +183,7 @@ func editorProcessKeyPress() {
 func editorDrawRows(abuf *bytes.Buffer) {
 	for y := 0; y < E.screenrows; y++ {
 		if y >= E.numrows {
-			if y == E.screenrows/3 {
+			if E.numrows == 0 && y == E.screenrows/3 {
 				welcomeMessage := fmt.Sprintf("Goditor editor -- version %s", GODITOR_VERSION)
 				if len(welcomeMessage) > E.screencols {
 					welcomeMessage = welcomeMessage[:E.screencols-1]
@@ -180,7 +198,7 @@ func editorDrawRows(abuf *bytes.Buffer) {
 				abuf.WriteString("~")
 			}
 		} else {
-			for _, c := range E.row.chars {
+			for _, c := range E.row[y].chars {
 				abuf.WriteByte(c)
 			}
 		}
@@ -221,12 +239,15 @@ func initEditor() {
 	E.cx = 0
 	E.cy = 0
 	E.numrows = 0
+	E.row = nil
 }
 
 func main() {
 	enableRawMode()
 	initEditor()
-	editorOpen()
+	if len(os.Args) >= 2 {
+		editorOpen(os.Args[1])
+	}
 
 	for {
 		editorRefreshScreen()
