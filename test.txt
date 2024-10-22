@@ -6,32 +6,41 @@ d even
 d
 dd
 d
-
-
-
-
+dfsd
+func main:w
+d
+dsfsd
 
 ddd
 
 
+isdfsdf dsfsd fdsf sdf sd
+fssdf
+sdfsddf sdf sdf
+df
 
+dsdf
+sd
+f
+ sd
+f
+sdf
+s
+df
+ 
 
+s
+df
+ sdf
+ dsf
 
+ sdf
+ sdf dsf 
 
+func editdforFundText() {
+var gor ero sw = fmt.Sprintf("sldfkjl")
+}df
 
-
-
-
-
-
-
-
-
-
-func editorFundText() {
-var gor erow = fmt.Sprintf("sldfkjl")
-}
-
-
-
-
+df
+sd
+fdf

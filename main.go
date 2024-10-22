@@ -33,6 +33,7 @@ type erow struct {
 
 type EditorConfig struct {
 	cx, cy                 int
+	rowoff                 int
 	screenrows, screencols int
 	numrows                int
 	row                    []erow
@@ -69,22 +70,22 @@ func editorOpen(filename string) {
 	defer file.Close()
 
 	sc := bufio.NewScanner(file)
-	lineIndex := 0
 	for sc.Scan() {
-		// fix this here - fucked up array index
 		line := sc.Text()
-		E.row[lineIndex].size = len(line)
-		E.row[lineIndex].chars = append(E.row[lineIndex].chars, []byte(line)...)
-		E.numrows++
-		lineIndex++
+		editorAppendRow([]byte(line))
 	}
 	if err := sc.Err(); err != nil {
 		die(fmt.Sprintf("scanning file error %v", err))
 	}
+}
 
-	// E.row.size = len(line)
-	// E.row.chars = line
-	// E.numrows = 1
+func editorAppendRow(line []byte) {
+	row := erow{
+		size:  len(line),
+		chars: line,
+	}
+	E.row = append(E.row, row)
+	E.numrows++
 }
 
 func editorMoveCursor(c int) {
@@ -93,22 +94,18 @@ func editorMoveCursor(c int) {
 		if E.cy != 0 {
 			E.cy--
 		}
-		break
 	case ARROW_DOWN:
-		if E.cy != E.screenrows-1 {
+		if E.cy < E.numrows {
 			E.cy++
 		}
-		break
 	case ARROW_LEFT:
 		if E.cx != 0 {
 			E.cx--
 		}
-		break
 	case ARROW_RIGHT:
 		if E.cx != E.screencols-1 {
 			E.cx++
 		}
-		break
 	}
 
 }
@@ -182,7 +179,8 @@ func editorProcessKeyPress() {
 
 func editorDrawRows(abuf *bytes.Buffer) {
 	for y := 0; y < E.screenrows; y++ {
-		if y >= E.numrows {
+		filerow := y + E.rowoff
+		if filerow >= E.numrows {
 			if E.numrows == 0 && y == E.screenrows/3 {
 				welcomeMessage := fmt.Sprintf("Goditor editor -- version %s", GODITOR_VERSION)
 				if len(welcomeMessage) > E.screencols {
@@ -198,9 +196,10 @@ func editorDrawRows(abuf *bytes.Buffer) {
 				abuf.WriteString("~")
 			}
 		} else {
-			for _, c := range E.row[y].chars {
-				abuf.WriteByte(c)
-			}
+			// for _, c := range E.row[y].chars {
+			// 	abuf.WriteByte(c)
+			// }
+			abuf.Write(E.row[filerow].chars)
 		}
 
 		abuf.WriteString("\x1b[K")
@@ -210,7 +209,18 @@ func editorDrawRows(abuf *bytes.Buffer) {
 	}
 }
 
+func editorScroll() {
+	if E.cy < E.rowoff {
+		E.rowoff = E.cy
+	}
+	if E.cy >= E.screenrows+E.rowoff {
+		E.rowoff = E.cy - E.screenrows + 1
+	}
+}
+
 func editorRefreshScreen() {
+	editorScroll()
+
 	abuf := bytes.Buffer{}
 	abuf.Reset()
 
@@ -222,7 +232,7 @@ func editorRefreshScreen() {
 	editorDrawRows(&abuf)
 
 	// abuf.WriteString("\x1b[H")
-	abuf.WriteString(fmt.Sprintf("\x1b[%d;%dH", E.cy+1, E.cx+1))
+	abuf.WriteString(fmt.Sprintf("\x1b[%d;%dH", (E.cy-E.rowoff)+1, E.cx+1))
 	abuf.WriteString("\x1b[?25h")
 
 	os.Stdout.Write(abuf.Bytes())
@@ -238,6 +248,7 @@ func initEditor() {
 	E.screenrows = height
 	E.cx = 0
 	E.cy = 0
+	E.rowoff = 0
 	E.numrows = 0
 	E.row = nil
 }
