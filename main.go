@@ -33,7 +33,7 @@ type erow struct {
 
 type EditorConfig struct {
 	cx, cy                 int
-	rowoff                 int
+	rowoff, coloff         int
 	screenrows, screencols int
 	numrows                int
 	row                    []erow
@@ -103,9 +103,9 @@ func editorMoveCursor(c int) {
 			E.cx--
 		}
 	case ARROW_RIGHT:
-		if E.cx != E.screencols-1 {
-			E.cx++
-		}
+		// if E.cx != E.screencols-1 {
+		E.cx++
+		// }
 	}
 
 }
@@ -199,7 +199,18 @@ func editorDrawRows(abuf *bytes.Buffer) {
 			// for _, c := range E.row[y].chars {
 			// 	abuf.WriteByte(c)
 			// }
-			abuf.Write(E.row[filerow].chars)
+			length := E.row[filerow].size - E.coloff
+			if length < 0 {
+				length = 0
+			}
+
+			if length > 0 {
+				if length > E.screencols {
+					length = E.screencols
+				}
+				rindex := E.coloff + length
+				abuf.Write(E.row[filerow].chars[E.coloff:rindex])
+			}
 		}
 
 		abuf.WriteString("\x1b[K")
@@ -215,6 +226,13 @@ func editorScroll() {
 	}
 	if E.cy >= E.screenrows+E.rowoff {
 		E.rowoff = E.cy - E.screenrows + 1
+	}
+
+	if E.cx < E.coloff {
+		E.coloff = E.cx
+	}
+	if E.cx >= E.screencols+E.coloff {
+		E.coloff = E.cx - E.screencols + 1
 	}
 }
 
@@ -232,7 +250,8 @@ func editorRefreshScreen() {
 	editorDrawRows(&abuf)
 
 	// abuf.WriteString("\x1b[H")
-	abuf.WriteString(fmt.Sprintf("\x1b[%d;%dH", (E.cy-E.rowoff)+1, E.cx+1))
+	abuf.WriteString(fmt.Sprintf("\x1b[%d;%dH", (E.cy-E.rowoff)+1, (E.cx-E.coloff)+1))
+
 	abuf.WriteString("\x1b[?25h")
 
 	os.Stdout.Write(abuf.Bytes())
@@ -249,6 +268,7 @@ func initEditor() {
 	E.cx = 0
 	E.cy = 0
 	E.rowoff = 0
+	E.coloff = 0
 	E.numrows = 0
 	E.row = nil
 }
