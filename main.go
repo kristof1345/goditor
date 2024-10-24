@@ -89,6 +89,14 @@ func editorAppendRow(line []byte) {
 }
 
 func editorMoveCursor(c int) {
+	var row *erow
+
+	if E.cy >= E.numrows {
+		row = nil
+	} else {
+		row = &E.row[E.cy]
+	}
+
 	switch c {
 	case ARROW_UP:
 		if E.cy != 0 {
@@ -103,11 +111,23 @@ func editorMoveCursor(c int) {
 			E.cx--
 		}
 	case ARROW_RIGHT:
-		// if E.cx != E.screencols-1 {
-		E.cx++
-		// }
+		if row != nil && E.cx < row.size {
+			E.cx++
+		}
 	}
 
+	if E.cy >= E.numrows {
+		row = nil
+	} else {
+		row = &E.row[E.cy]
+	}
+	var rowlen int = 0
+	if row != nil {
+		rowlen = row.size
+	}
+	if E.cx > rowlen {
+		E.cx = rowlen
+	}
 }
 
 func editorReadKey() int {
