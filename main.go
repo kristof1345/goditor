@@ -42,7 +42,7 @@ type EditorConfig struct {
 var (
 	terminalState *term.State
 	E             = EditorConfig{}
-	// abuf          = bytes.Buffer{}
+	// abuf          = byte.Buffer{}
 )
 
 func die(error string) {
@@ -110,9 +110,21 @@ func editorMoveCursor(c int) {
 		if E.cx != 0 {
 			E.cx--
 		}
+		if E.cy != 0 {
+			if E.cx == 0 {
+				E.cy--
+				E.cx = E.row[E.cy].size
+			}
+		}
 	case ARROW_RIGHT:
 		if row != nil && E.cx < row.size {
 			E.cx++
+		}
+		if E.cy != E.numrows {
+			if E.cx == row.size {
+				E.cy++
+				E.cx = 0
+			}
 		}
 	}
 
