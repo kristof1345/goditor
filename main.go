@@ -11,6 +11,7 @@ import (
 )
 
 var GODITOR_VERSION string = "0.0.1"
+var COLS_FOR_LINE_NUMS int = 5
 
 func CONTROL_KEY(key byte) int {
 	return int(key & 0x1f)
@@ -109,12 +110,9 @@ func editorMoveCursor(c int) {
 	case ARROW_LEFT:
 		if E.cx != 0 {
 			E.cx--
-		}
-		if E.cy != 0 {
-			if E.cx == 0 {
-				E.cy--
-				E.cx = E.row[E.cy].size
-			}
+		} else if E.cy > 0 {
+			E.cy--
+			E.cx = E.row[E.cy].size
 		}
 	case ARROW_RIGHT:
 		if row != nil && E.cx < row.size {
@@ -228,9 +226,6 @@ func editorDrawRows(abuf *bytes.Buffer) {
 				abuf.WriteString("~")
 			}
 		} else {
-			// for _, c := range E.row[y].chars {
-			// 	abuf.WriteByte(c)
-			// }
 			length := E.row[filerow].size - E.coloff
 			if length < 0 {
 				length = 0
@@ -241,6 +236,9 @@ func editorDrawRows(abuf *bytes.Buffer) {
 					length = E.screencols
 				}
 				rindex := E.coloff + length
+				// sideOne := fmt.Sprintf("%-5d", filerow // -- we were onto something with this one
+				// charsInOne := append([]byte(sideOne), E.row[filerow].chars...)
+				// abuf.Write(charsInOne[E.coloff:rindex])
 				abuf.Write(E.row[filerow].chars[E.coloff:rindex])
 			}
 		}
@@ -282,7 +280,7 @@ func editorRefreshScreen() {
 	editorDrawRows(&abuf)
 
 	// abuf.WriteString("\x1b[H")
-	abuf.WriteString(fmt.Sprintf("\x1b[%d;%dH", (E.cy-E.rowoff)+1, (E.cx-E.coloff)+1))
+	abuf.WriteString(fmt.Sprintf("\x1b[%d;%dH", (E.cy-E.rowoff)+1, (E.cx-E.coloff)+1)) // I can augment how much I add to the cursor position, pushing it off that much - the key to line numbers
 
 	abuf.WriteString("\x1b[?25h")
 
