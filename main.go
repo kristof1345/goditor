@@ -11,7 +11,9 @@ import (
 )
 
 var GODITOR_VERSION string = "0.0.1"
-var COLS_FOR_LINE_NUMS int = 5
+
+// var COLS_FOR_LINE_NUMS int = 5
+var TAB_STOP = 8
 
 func CONTROL_KEY(key byte) int {
 	return int(key & 0x1f)
@@ -28,12 +30,14 @@ const (
 )
 
 type erow struct {
-	size  int
-	chars []byte
+	size   int
+	chars  []byte
+	rsize  int
+	render []byte
 }
 
 type EditorConfig struct {
-	cx, cy                 int
+	cx, cy, rx             int
 	rowoff, coloff         int
 	screenrows, screencols int
 	numrows                int
@@ -80,12 +84,51 @@ func editorOpen(filename string) {
 	}
 }
 
+func editorRowCxToRx(row *erow, cx int) int {
+	var rx int
+	for i := 0; i < cx; i++ {
+		if row.chars[i] == '\t' {
+			rx += (TAB_STOP - 1) - (rx % TAB_STOP)
+		}
+		rx++
+	}
+	return rx
+}
+
+func editorUpdateRow(row *erow) {
+	tab := 0
+	for j := 0; j < row.size; j++ {
+		if row.chars[j] == '\t' {
+			tab++
+		}
+	}
+	row.render = make([]byte, row.size+tab*(TAB_STOP-1)+1)
+
+	var idx int = 0
+	for i := 0; i < row.size; i++ {
+		if row.chars[i] == '\t' {
+			row.render[idx] = ' '
+			idx++
+			for idx%TAB_STOP != 0 {
+				row.render[idx] = ' '
+				idx++
+			}
+		} else {
+			row.render[idx] = row.chars[i]
+			idx++
+		}
+	}
+	row.rsize = idx
+}
+
 func editorAppendRow(line []byte) {
 	row := erow{
 		size:  len(line),
 		chars: line,
 	}
 	E.row = append(E.row, row)
+	editorUpdateRow(&E.row[E.numrows])
+
 	E.numrows++
 }
 
@@ -226,7 +269,7 @@ func editorDrawRows(abuf *bytes.Buffer) {
 				abuf.WriteString("~")
 			}
 		} else {
-			length := E.row[filerow].size - E.coloff
+			length := E.row[filerow].rsize - E.coloff
 			if length < 0 {
 				length = 0
 			}
@@ -239,7 +282,7 @@ func editorDrawRows(abuf *bytes.Buffer) {
 				// sideOne := fmt.Sprintf("%-5d", filerow // -- we were onto something with this one
 				// charsInOne := append([]byte(sideOne), E.row[filerow].chars...)
 				// abuf.Write(charsInOne[E.coloff:rindex])
-				abuf.Write(E.row[filerow].chars[E.coloff:rindex])
+				abuf.Write(E.row[filerow].render[E.coloff:rindex])
 			}
 		}
 
@@ -251,6 +294,10 @@ func editorDrawRows(abuf *bytes.Buffer) {
 }
 
 func editorScroll() {
+	E.rx = 0
+	if E.cy < E.numrows {
+		E.rx = editorRowCxToRx(&E.row[E.cy], E.cx)
+	}
 	if E.cy < E.rowoff {
 		E.rowoff = E.cy
 	}
@@ -258,11 +305,11 @@ func editorScroll() {
 		E.rowoff = E.cy - E.screenrows + 1
 	}
 
-	if E.cx < E.coloff {
-		E.coloff = E.cx
+	if E.rx < E.coloff {
+		E.coloff = E.rx
 	}
-	if E.cx >= E.screencols+E.coloff {
-		E.coloff = E.cx - E.screencols + 1
+	if E.rx >= E.screencols+E.coloff {
+		E.coloff = E.rx - E.screencols + 1
 	}
 }
 
@@ -280,7 +327,7 @@ func editorRefreshScreen() {
 	editorDrawRows(&abuf)
 
 	// abuf.WriteString("\x1b[H")
-	abuf.WriteString(fmt.Sprintf("\x1b[%d;%dH", (E.cy-E.rowoff)+1, (E.cx-E.coloff)+1)) // I can augment how much I add to the cursor position, pushing it off that much - the key to line numbers
+	abuf.WriteString(fmt.Sprintf("\x1b[%d;%dH", (E.cy-E.rowoff)+1, (E.rx-E.coloff)+1)) // I can augment how much I add to the cursor position, pushing it off that much - the key to line numbers
 
 	abuf.WriteString("\x1b[?25h")
 
@@ -297,6 +344,7 @@ func initEditor() {
 	E.screenrows = height
 	E.cx = 0
 	E.cy = 0
+	E.rx = 0 // just so you know... cx is the index into the chars field. rx is the index into the render field
 	E.rowoff = 0
 	E.coloff = 0
 	E.numrows = 0
