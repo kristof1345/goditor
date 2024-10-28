@@ -40,6 +40,7 @@ type EditorConfig struct {
 	cx, cy, rx             int
 	rowoff, coloff         int
 	screenrows, screencols int
+	filename               string
 	numrows                int
 	row                    []erow
 }
@@ -73,6 +74,8 @@ func editorOpen(filename string) {
 		die("opening file")
 	}
 	defer file.Close()
+
+	E.filename = filename
 
 	sc := bufio.NewScanner(file)
 	for sc.Scan() {
@@ -287,10 +290,36 @@ func editorDrawRows(abuf *bytes.Buffer) {
 		}
 
 		abuf.WriteString("\x1b[K")
-		if y < E.screenrows-1 {
-			abuf.WriteString("\n")
+		abuf.WriteString("\n")
+	}
+}
+
+func editorDrawStatusBar(abuf *bytes.Buffer) {
+	abuf.WriteString("\x1b[7m")
+
+	length := ""
+	if E.filename != "" {
+		length = fmt.Sprintf("%.20s - %d lines", E.filename, E.numrows)
+	} else {
+		length = fmt.Sprintf("%.20s - %d lines", "[No Name]", E.numrows)
+	}
+	rlength := fmt.Sprintf("%d/%d", E.cy+1, E.numrows)
+	if len(length) > E.screencols {
+		length = length[:E.screencols]
+	}
+	abuf.WriteString(length)
+	counter := len(length)
+	for counter < E.screencols {
+		if E.screencols-counter == len(rlength) {
+			abuf.WriteString(rlength)
+			break
+		} else {
+			abuf.WriteString(" ")
+			counter++
 		}
 	}
+
+	abuf.WriteString("\x1b[m")
 }
 
 func editorScroll() {
@@ -325,6 +354,7 @@ func editorRefreshScreen() {
 	abuf.WriteString("\x1b[H")
 
 	editorDrawRows(&abuf)
+	editorDrawStatusBar(&abuf)
 
 	// abuf.WriteString("\x1b[H")
 	abuf.WriteString(fmt.Sprintf("\x1b[%d;%dH", (E.cy-E.rowoff)+1, (E.rx-E.coloff)+1)) // I can augment how much I add to the cursor position, pushing it off that much - the key to line numbers
@@ -349,6 +379,9 @@ func initEditor() {
 	E.coloff = 0
 	E.numrows = 0
 	E.row = nil
+	E.filename = ""
+
+	E.screenrows -= 1
 }
 
 func main() {
