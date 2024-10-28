@@ -11,9 +11,11 @@ import (
 	"golang.org/x/term"
 )
 
-var GODITOR_VERSION string = "0.0.1"
+/*** TODO ***/
+// First of all, the biggest problem is that since I added linenumbers... The whole cx is pushed off in the editor. The screen is showing 5 more columns then it should and 5 less characters from the file, this has to be sorted out
 
-// var COLS_FOR_LINE_NUMS int = 5
+var GODITOR_VERSION string = "0.0.1"
+var COLS_FOR_LINENUM int = 5
 var TAB_STOP = 8
 
 func CONTROL_KEY(key byte) int {
@@ -21,6 +23,7 @@ func CONTROL_KEY(key byte) int {
 }
 
 const (
+	BACKSPACE  = 127
 	ARROW_LEFT = 1000 + iota
 	ARROW_RIGHT
 	ARROW_UP
@@ -253,6 +256,11 @@ func editorProcessKeyPress() {
 	c := editorReadKey()
 
 	switch c {
+	case '\r':
+		// TODO
+		break
+	case CONTROL_KEY('l'), '\x1b':
+		break
 	case CONTROL_KEY('q'):
 		os.Stdout.Write([]byte("\x1b[2J"))
 		os.Stdout.Write([]byte("\x1b[H"))
@@ -270,9 +278,25 @@ func editorProcessKeyPress() {
 	case ARROW_UP, ARROW_DOWN, ARROW_LEFT, ARROW_RIGHT:
 		editorMoveCursor(c)
 		break
+	case BACKSPACE, CONTROL_KEY('h'), DEL_KEY:
+		// TODO
+		break
 	default:
 		editorInsertChar(c)
 		break
+	}
+}
+
+func editorDrawLineNum(abuf *bytes.Buffer, filerow int) {
+	if E.coloff < COLS_FOR_LINENUM {
+		visibleLineNumberWidth := COLS_FOR_LINENUM - E.coloff
+		lineNumber := fmt.Sprintf("%-5d", filerow) // -- we were onto something with this one
+		if visibleLineNumberWidth > 0 && visibleLineNumberWidth <= len(lineNumber) {
+			trimmedLineNumber := lineNumber[len(lineNumber)-visibleLineNumberWidth:]
+			abuf.WriteString(trimmedLineNumber)
+		} else if visibleLineNumberWidth > 5 {
+			abuf.WriteString(lineNumber)
+		}
 	}
 }
 
@@ -295,19 +319,17 @@ func editorDrawRows(abuf *bytes.Buffer) {
 				abuf.WriteString("~")
 			}
 		} else {
+			editorDrawLineNum(abuf, filerow)
+
 			length := E.row[filerow].rsize - E.coloff
 			if length < 0 {
 				length = 0
 			}
-
 			if length > 0 {
 				if length > E.screencols {
-					length = E.screencols
+					length = E.screencols - COLS_FOR_LINENUM
 				}
 				rindex := E.coloff + length
-				// sideOne := fmt.Sprintf("%-5d", filerow // -- we were onto something with this one
-				// charsInOne := append([]byte(sideOne), E.row[filerow].chars...)
-				// abuf.Write(charsInOne[E.coloff:rindex])
 				abuf.Write(E.row[filerow].render[E.coloff:rindex])
 			}
 		}
