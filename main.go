@@ -90,6 +90,15 @@ func editorOpen(filename string) {
 	}
 }
 
+func editorRowInsertChar(row *erow, at int, c byte) {
+	if at < 0 || at > row.size {
+		at = row.size
+	}
+	row.chars = append(append(row.chars[:at], c), row.chars[at:]...)
+	row.size += 1
+	editorUpdateRow(row)
+}
+
 func editorRowCxToRx(row *erow, cx int) int {
 	var rx int
 	for i := 0; i < cx; i++ {
@@ -136,6 +145,14 @@ func editorAppendRow(line []byte) {
 	editorUpdateRow(&E.row[E.numrows])
 
 	E.numrows++
+}
+
+func editorInsertChar(c int) {
+	if E.cy == E.numrows {
+		editorAppendRow([]byte(""))
+	}
+	editorRowInsertChar(&E.row[E.cy], E.cx, byte(c))
+	E.cx++
 }
 
 func editorMoveCursor(c int) {
@@ -252,6 +269,9 @@ func editorProcessKeyPress() {
 		break
 	case ARROW_UP, ARROW_DOWN, ARROW_LEFT, ARROW_RIGHT:
 		editorMoveCursor(c)
+		break
+	default:
+		editorInsertChar(c)
 		break
 	}
 }
