@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"golang.org/x/term"
 )
@@ -43,6 +44,8 @@ type EditorConfig struct {
 	filename               string
 	numrows                int
 	row                    []erow
+	statusmsg              string
+	statusmsg_time         time.Time
 }
 
 var (
@@ -320,6 +323,19 @@ func editorDrawStatusBar(abuf *bytes.Buffer) {
 	}
 
 	abuf.WriteString("\x1b[m")
+	abuf.WriteString("\r\n")
+}
+
+func editorDrawMessageBar(abuf *bytes.Buffer) {
+	abuf.WriteString("\x1b[K")
+	localMessage := E.statusmsg
+	if len(E.statusmsg) > E.screencols {
+		localMessage = localMessage[:E.screencols]
+	}
+	timeWentBy := time.Now().Sub(E.statusmsg_time)
+	if timeWentBy < time.Second*5 {
+		abuf.WriteString(localMessage)
+	}
 }
 
 func editorScroll() {
@@ -342,6 +358,11 @@ func editorScroll() {
 	}
 }
 
+func editorSetStatusMessage(format string) {
+	E.statusmsg = format
+	E.statusmsg_time = time.Now()
+}
+
 func editorRefreshScreen() {
 	editorScroll()
 
@@ -355,6 +376,7 @@ func editorRefreshScreen() {
 
 	editorDrawRows(&abuf)
 	editorDrawStatusBar(&abuf)
+	editorDrawMessageBar(&abuf)
 
 	// abuf.WriteString("\x1b[H")
 	abuf.WriteString(fmt.Sprintf("\x1b[%d;%dH", (E.cy-E.rowoff)+1, (E.rx-E.coloff)+1)) // I can augment how much I add to the cursor position, pushing it off that much - the key to line numbers
@@ -381,7 +403,7 @@ func initEditor() {
 	E.row = nil
 	E.filename = ""
 
-	E.screenrows -= 1
+	E.screenrows -= 2
 }
 
 func main() {
@@ -390,6 +412,8 @@ func main() {
 	if len(os.Args) >= 2 {
 		editorOpen(os.Args[1])
 	}
+
+	editorSetStatusMessage("Help: CTRL-Q = quit")
 
 	for {
 		editorRefreshScreen()
