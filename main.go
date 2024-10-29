@@ -15,7 +15,6 @@ import (
 // First of all, the biggest problem is that since I added linenumbers... The whole cx is pushed off in the editor. The screen is showing 5 more columns then it should and 5 less characters from the file, this has to be sorted out
 
 var GODITOR_VERSION string = "0.0.1"
-var COLS_FOR_LINENUM int = 5
 var TAB_STOP = 8
 
 func CONTROL_KEY(key byte) int {
@@ -44,11 +43,13 @@ type EditorConfig struct {
 	cx, cy, rx             int
 	rowoff, coloff         int
 	screenrows, screencols int
+	raw_screencols         int
 	filename               string
 	numrows                int
 	row                    []erow
 	statusmsg              string
 	statusmsg_time         time.Time
+	linenum_indent         int
 }
 
 var (
@@ -186,12 +187,9 @@ func editorMoveCursor(c int) {
 	case ARROW_RIGHT:
 		if row != nil && E.cx < row.size {
 			E.cx++
-		}
-		if E.cy != E.numrows {
-			if E.cx == row.size {
-				E.cy++
-				E.cx = 0
-			}
+		} else if row != nil && E.cx == row.size {
+			E.cy++
+			E.cx = 0
 		}
 	}
 
@@ -288,21 +286,20 @@ func editorProcessKeyPress() {
 }
 
 func editorDrawLineNum(abuf *bytes.Buffer, filerow int) {
-	if E.coloff < COLS_FOR_LINENUM {
-		visibleLineNumberWidth := COLS_FOR_LINENUM - E.coloff
-		lineNumber := fmt.Sprintf("%-5d", filerow) // -- we were onto something with this one
-		if visibleLineNumberWidth > 0 && visibleLineNumberWidth <= len(lineNumber) {
-			trimmedLineNumber := lineNumber[len(lineNumber)-visibleLineNumberWidth:]
-			abuf.WriteString(trimmedLineNumber)
-		} else if visibleLineNumberWidth > 5 {
-			abuf.WriteString(lineNumber)
-		}
+	format := fmt.Sprintf("%%%dd ", E.linenum_indent-1)
+	linenum := strings.Repeat(" ", E.linenum_indent)
+	if filerow < E.numrows {
+		linenum = fmt.Sprintf(format, filerow+1)
 	}
+	abuf.WriteString("\x1b[90m")
+	abuf.Write([]byte(linenum))
+	abuf.WriteString("\x1b[m")
 }
 
 func editorDrawRows(abuf *bytes.Buffer) {
 	for y := 0; y < E.screenrows; y++ {
 		filerow := y + E.rowoff
+
 		if filerow >= E.numrows {
 			if E.numrows == 0 && y == E.screenrows/3 {
 				welcomeMessage := fmt.Sprintf("Goditor editor -- version %s", GODITOR_VERSION)
@@ -327,7 +324,7 @@ func editorDrawRows(abuf *bytes.Buffer) {
 			}
 			if length > 0 {
 				if length > E.screencols {
-					length = E.screencols - COLS_FOR_LINENUM
+					length = E.screencols
 				}
 				rindex := E.coloff + length
 				abuf.Write(E.row[filerow].render[E.coloff:rindex])
@@ -349,13 +346,13 @@ func editorDrawStatusBar(abuf *bytes.Buffer) {
 		length = fmt.Sprintf("%.20s - %d lines", "[No Name]", E.numrows)
 	}
 	rlength := fmt.Sprintf("%d/%d", E.cy+1, E.numrows)
-	if len(length) > E.screencols {
-		length = length[:E.screencols]
+	if len(length) > E.raw_screencols {
+		length = length[:E.raw_screencols]
 	}
 	abuf.WriteString(length)
 	counter := len(length)
-	for counter < E.screencols {
-		if E.screencols-counter == len(rlength) {
+	for counter < E.raw_screencols {
+		if E.raw_screencols-counter == len(rlength) {
 			abuf.WriteString(rlength)
 			break
 		} else {
@@ -405,7 +402,27 @@ func editorSetStatusMessage(format string) {
 	E.statusmsg_time = time.Now()
 }
 
+// func editorUpdateLinenumIndent() {
+// 	var digit int
+// 	var numrows int = E.numrows
+//
+// 	if numrows == 0 {
+// 		digit = 0
+// 		E.linenum_indent = 2
+// 		return
+// 	}
+//
+// 	digit = 1
+// 	for numrows >= 10 {
+// 		numrows = numrows / 10
+// 		digit++
+// 	}
+// 	E.linenum_indent = digit + 2
+// }
+
 func editorRefreshScreen() {
+	// editorUpdateLinenumIndent()
+	E.screencols = E.raw_screencols - E.linenum_indent
 	editorScroll()
 
 	abuf := bytes.Buffer{}
@@ -421,7 +438,7 @@ func editorRefreshScreen() {
 	editorDrawMessageBar(&abuf)
 
 	// abuf.WriteString("\x1b[H")
-	abuf.WriteString(fmt.Sprintf("\x1b[%d;%dH", (E.cy-E.rowoff)+1, (E.rx-E.coloff)+1)) // I can augment how much I add to the cursor position, pushing it off that much - the key to line numbers
+	abuf.WriteString(fmt.Sprintf("\x1b[%d;%dH", E.cy-E.rowoff+1, E.rx-E.coloff+1+E.linenum_indent)) // I can augment how much I add to the cursor position, pushing it off that much - the key to line numbers
 
 	abuf.WriteString("\x1b[?25h")
 
@@ -436,6 +453,7 @@ func initEditor() {
 
 	E.screencols = width
 	E.screenrows = height
+	E.raw_screencols = width
 	E.cx = 0
 	E.cy = 0
 	E.rx = 0 // just so you know... cx is the index into the chars field. rx is the index into the render field
@@ -444,6 +462,7 @@ func initEditor() {
 	E.numrows = 0
 	E.row = nil
 	E.filename = ""
+	E.linenum_indent = 6
 
 	E.screenrows -= 2
 }
