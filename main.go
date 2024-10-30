@@ -4,15 +4,13 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 	"time"
 
 	"golang.org/x/term"
 )
-
-/*** TODO ***/
-// First of all, the biggest problem is that since I added linenumbers... The whole cx is pushed off in the editor. The screen is showing 5 more columns then it should and 5 less characters from the file, this has to be sorted out
 
 var GODITOR_VERSION string = "0.0.1"
 var TAB_STOP = 8
@@ -50,6 +48,7 @@ type EditorConfig struct {
 	statusmsg              string
 	statusmsg_time         time.Time
 	linenum_indent         int
+	dirty                  bool
 }
 
 var (
@@ -59,6 +58,7 @@ var (
 )
 
 func die(error string) {
+	os.Stdout.Write([]byte("\x1b[3J"))
 	os.Stdout.Write([]byte("\x1b[2J"))
 	os.Stdout.Write([]byte("\x1b[H"))
 	term.Restore(int(os.Stdout.Fd()), terminalState)
@@ -92,14 +92,62 @@ func editorOpen(filename string) {
 	if err := sc.Err(); err != nil {
 		die(fmt.Sprintf("scanning file error %v", err))
 	}
+	E.dirty = false
+}
+
+func editorSave() {
+	if E.filename == "" {
+		return
+	}
+
+	buf, length := editorRowToString()
+
+	file, err := os.OpenFile(E.filename, os.O_CREATE|os.O_RDWR, 0644)
+	if err != nil {
+		editorSetStatusMessage("can't save! file open error: %s", err)
+		return
+	}
+	defer file.Close()
+
+	writtenLength := 0
+	writtenLength, err = io.WriteString(file, buf)
+	if err == nil {
+		if writtenLength == length {
+			editorSetStatusMessage("%d bytes written to disk", length)
+			E.dirty = false
+			return
+		}
+	}
+
+	editorSetStatusMessage("can't save! I/O error: %s", err)
+}
+
+func editorRowToString() (string, int) {
+	buffer := ""
+	length := 0
+	for _, row := range E.row {
+		length += row.size + 1
+		buffer += string(row.chars) + "\n"
+	}
+	return buffer, length
 }
 
 func editorRowInsertChar(row *erow, at int, c byte) {
 	if at < 0 || at > row.size {
-		at = row.size
+		row.chars = append(row.chars, c)
+	} else if at == 0 {
+		t := make([]byte, row.size+1)
+		t[0] = c
+		copy(t[1:], row.chars)
+		row.chars = t
+	} else {
+		row.chars = append(
+			row.chars[:at],
+			append(append(make([]byte, 0), c), row.chars[at:]...)...,
+		)
 	}
-	row.chars = append(append(row.chars[:at], c), row.chars[at:]...)
-	row.size += 1
+	E.dirty = true
+	row.size = len(row.chars)
 	editorUpdateRow(row)
 }
 
@@ -147,7 +195,6 @@ func editorAppendRow(line []byte) {
 	}
 	E.row = append(E.row, row)
 	editorUpdateRow(&E.row[E.numrows])
-
 	E.numrows++
 }
 
@@ -246,9 +293,9 @@ func editorReadKey() int {
 	} else {
 		return int(b[0])
 	}
-
-	// return b[0]
 }
+
+var QUIT_TIMES int = 2
 
 func editorProcessKeyPress() {
 	c := editorReadKey()
@@ -260,10 +307,19 @@ func editorProcessKeyPress() {
 	case CONTROL_KEY('l'), '\x1b':
 		break
 	case CONTROL_KEY('q'):
+		if E.dirty && QUIT_TIMES > 0 {
+			editorSetStatusMessage("unsaved changes! press CTRL-Q %d more times to quit", QUIT_TIMES)
+			QUIT_TIMES--
+			return
+		}
+		os.Stdout.Write([]byte("\x1b[3J"))
 		os.Stdout.Write([]byte("\x1b[2J"))
 		os.Stdout.Write([]byte("\x1b[H"))
 		term.Restore(int(os.Stdout.Fd()), terminalState)
 		os.Exit(0)
+	case CONTROL_KEY('s'):
+		editorSave()
+		break
 	case PAGE_UP, PAGE_DOWN:
 		for i := 0; i < E.screenrows; i++ {
 			if c == PAGE_UP {
@@ -283,6 +339,8 @@ func editorProcessKeyPress() {
 		editorInsertChar(c)
 		break
 	}
+
+	QUIT_TIMES = 2
 }
 
 func editorDrawLineNum(abuf *bytes.Buffer, filerow int) {
@@ -341,7 +399,11 @@ func editorDrawStatusBar(abuf *bytes.Buffer) {
 
 	length := ""
 	if E.filename != "" {
-		length = fmt.Sprintf("%.20s - %d lines", E.filename, E.numrows)
+		if E.dirty {
+			length = fmt.Sprintf("%.20s[+] - %d lines", E.filename, E.numrows)
+		} else {
+			length = fmt.Sprintf("%.20s - %d lines", E.filename, E.numrows)
+		}
 	} else {
 		length = fmt.Sprintf("%.20s - %d lines", "[No Name]", E.numrows)
 	}
@@ -397,8 +459,8 @@ func editorScroll() {
 	}
 }
 
-func editorSetStatusMessage(format string) {
-	E.statusmsg = format
+func editorSetStatusMessage(args ...interface{}) { // interface{} type basically means that it can accept any type because all types implement the empty interface
+	E.statusmsg = fmt.Sprintf(args[0].(string), args[1:]...)
 	E.statusmsg_time = time.Now()
 }
 
@@ -463,6 +525,7 @@ func initEditor() {
 	E.row = nil
 	E.filename = ""
 	E.linenum_indent = 6
+	E.dirty = false
 
 	E.screenrows -= 2
 }
@@ -474,7 +537,7 @@ func main() {
 		editorOpen(os.Args[1])
 	}
 
-	editorSetStatusMessage("Help: CTRL-Q = quit")
+	editorSetStatusMessage("Help: CTRL-S = save | CTRL-Q = quit")
 
 	for {
 		editorRefreshScreen()
