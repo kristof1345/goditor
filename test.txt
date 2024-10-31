@@ -7,8 +7,8 @@ d dslfk jsdfk jsdkf jdskfj s                    jjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjj
 dd
 dlksdfj sdfjjjjdsflkj 
 dfsd sdkf skljdf klfsdlf jskdlfj ksdoifn nlksf ljsdfksdjlfl kdsjfk lwefljdlsf;ioa sdjfskldfj oiwioeji jsdlfkj sdifijslk dlf wlefi disfjl dksjfl iosfid ofsddklf lkeilsdifl else ifsdklf j
-func main:w
-jdfj jsdfkjj
+nc main:w
+
 dsfsd
 jdjf 
 ddsdddddssdddddsdk
@@ -40,6 +40,11 @@ df
 func editdforFundText() {
 var gor ero sw = fmt.Sprintf("sldfkl")
 }df
+
+df
+sd
+fdf
+df
 
 df
 sd

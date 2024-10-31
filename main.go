@@ -132,6 +132,15 @@ func editorRowToString() (string, int) {
 	return buffer, length
 }
 
+func editorDelRow(at int) {
+	if at < 0 || at >= E.numrows {
+		return
+	}
+	E.row = append(E.row[:at], E.row[at+1:]...)
+	E.numrows--
+	E.dirty = true
+}
+
 func editorRowInsertChar(row *erow, at int, c byte) {
 	if at < 0 || at > row.size {
 		row.chars = append(row.chars, c)
@@ -149,6 +158,24 @@ func editorRowInsertChar(row *erow, at int, c byte) {
 	E.dirty = true
 	row.size = len(row.chars)
 	editorUpdateRow(row)
+}
+
+func editorRowAppendString(row *erow, str []byte, length int) {
+	row.chars = append(row.chars, str...)
+	row.size += length
+	editorUpdateRow(row)
+	E.dirty = true
+}
+
+func editorRowDelChar(row *erow, at int) {
+	if at < 0 || at >= row.size {
+		return
+	} else {
+		row.chars = append(row.chars[:at], row.chars[at+1:]...)
+	}
+	row.size--
+	editorUpdateRow(row)
+	E.dirty = true
 }
 
 func editorRowCxToRx(row *erow, cx int) int {
@@ -204,6 +231,25 @@ func editorInsertChar(c int) {
 	}
 	editorRowInsertChar(&E.row[E.cy], E.cx, byte(c))
 	E.cx++
+}
+
+func editorDelChar() {
+	if E.cy == E.numrows {
+		return
+	}
+	if E.cx == 0 && E.cy == 0 {
+		return
+	}
+
+	if E.cx > 0 {
+		editorRowDelChar(&E.row[E.cy], E.cx-1)
+		E.cx--
+	} else if E.cx == 0 {
+		E.cx = E.row[E.cy-1].size
+		editorRowAppendString(&E.row[E.cy-1], E.row[E.cy].chars, E.row[E.cy].size)
+		editorDelRow(E.cy)
+		E.cy--
+	}
 }
 
 func editorMoveCursor(c int) {
@@ -333,7 +379,10 @@ func editorProcessKeyPress() {
 		editorMoveCursor(c)
 		break
 	case BACKSPACE, CONTROL_KEY('h'), DEL_KEY:
-		// TODO
+		if c == DEL_KEY {
+			editorMoveCursor(ARROW_RIGHT)
+		}
+		editorDelChar()
 		break
 	default:
 		editorInsertChar(c)
