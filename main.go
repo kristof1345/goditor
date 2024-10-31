@@ -87,7 +87,7 @@ func editorOpen(filename string) {
 	sc := bufio.NewScanner(file)
 	for sc.Scan() {
 		line := sc.Text()
-		editorAppendRow([]byte(line))
+		editorInsertRow(E.numrows, []byte(line))
 	}
 	if err := sc.Err(); err != nil {
 		die(fmt.Sprintf("scanning file error %v", err))
@@ -215,22 +215,46 @@ func editorUpdateRow(row *erow) {
 	row.rsize = idx
 }
 
-func editorAppendRow(line []byte) {
+func editorInsertRow(at int, line []byte) {
+	if at < 0 || at > E.numrows {
+		return
+	}
 	row := erow{
 		size:  len(line),
 		chars: line,
 	}
-	E.row = append(E.row, row)
-	editorUpdateRow(&E.row[E.numrows])
+	if at == 0 {
+		E.row = append(append(make([]erow, 0), row), E.row...)
+	} else if at == E.numrows {
+		E.row = append(E.row, row)
+	} else {
+		E.row = append(E.row[:at], append(append(make([]erow, 0), row), E.row[at:]...)...)
+	}
+
+	editorUpdateRow(&E.row[at])
 	E.numrows++
+	E.dirty = true
 }
 
 func editorInsertChar(c int) {
 	if E.cy == E.numrows {
-		editorAppendRow([]byte(""))
+		editorInsertRow(E.numrows, []byte(""))
 	}
 	editorRowInsertChar(&E.row[E.cy], E.cx, byte(c))
 	E.cx++
+}
+
+func editorInsertNewLine() {
+	if E.cx == 0 {
+		editorInsertRow(E.cy, []byte(""))
+	} else {
+		editorInsertRow(E.cy+1, E.row[E.cy].chars[E.cx:])
+		E.row[E.cy].chars = E.row[E.cy].chars[:E.cx]
+		E.row[E.cy].size = len(E.row[E.cy].chars)
+		editorUpdateRow(&E.row[E.cy])
+	}
+	E.cy++
+	E.cx = 0
 }
 
 func editorDelChar() {
@@ -348,7 +372,7 @@ func editorProcessKeyPress() {
 
 	switch c {
 	case '\r':
-		// TODO
+		editorInsertNewLine()
 		break
 	case CONTROL_KEY('l'), '\x1b':
 		break
