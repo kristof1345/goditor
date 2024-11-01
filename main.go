@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"strings"
 	"time"
@@ -416,13 +417,31 @@ func editorProcessKeyPress() {
 	QUIT_TIMES = 2
 }
 
-func editorDrawLineNum(abuf *bytes.Buffer, filerow int) {
+// func editorDrawLineNum(abuf *bytes.Buffer, filerow int) {
+// 	format := fmt.Sprintf("%%%dd ", E.linenum_indent-1)
+// 	linenum := strings.Repeat(" ", E.linenum_indent)
+// 	if filerow < E.numrows {
+// 		linenum = fmt.Sprintf(format, filerow+1)
+// 	}
+// 	abuf.WriteString("\x1b[90m")
+// 	abuf.Write([]byte(linenum))
+// 	abuf.WriteString("\x1b[m")
+// }
+
+func editorDrawRelativeLineNum(abuf *bytes.Buffer, filerow int) {
 	format := fmt.Sprintf("%%%dd ", E.linenum_indent-1)
 	linenum := strings.Repeat(" ", E.linenum_indent)
+
 	if filerow < E.numrows {
-		linenum = fmt.Sprintf(format, filerow+1)
+		if E.cy == filerow {
+			linenum = fmt.Sprintf(format, filerow+1)
+		} else {
+			currLineNum := int(math.Abs(float64(E.cy - filerow)))
+			linenum = fmt.Sprintf(format, currLineNum)
+			abuf.WriteString("\x1b[90m")
+		}
 	}
-	abuf.WriteString("\x1b[90m")
+
 	abuf.Write([]byte(linenum))
 	abuf.WriteString("\x1b[m")
 }
@@ -447,7 +466,8 @@ func editorDrawRows(abuf *bytes.Buffer) {
 				abuf.WriteString("~")
 			}
 		} else {
-			editorDrawLineNum(abuf, filerow)
+			// editorDrawLineNum(abuf, filerow)
+			editorDrawRelativeLineNum(abuf, filerow)
 
 			length := E.row[filerow].rsize - E.coloff
 			if length < 0 {
