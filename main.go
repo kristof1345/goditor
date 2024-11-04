@@ -98,7 +98,11 @@ func editorOpen(filename string) {
 
 func editorSave() {
 	if E.filename == "" {
-		return
+		E.filename = editorPrompt("save as: %s (ESC to cancel)")
+		if E.filename == "" {
+			editorSetStatusMessage("save aborted")
+			return
+		}
 	}
 
 	buf, length := editorRowToString()
@@ -274,6 +278,33 @@ func editorDelChar() {
 		editorRowAppendString(&E.row[E.cy-1], E.row[E.cy].chars, E.row[E.cy].size)
 		editorDelRow(E.cy)
 		E.cy--
+	}
+}
+
+func editorPrompt(prompt string) string {
+	buf := ""
+
+	for {
+		editorSetStatusMessage(prompt, buf)
+		editorRefreshScreen()
+
+		c := editorReadKey()
+		if c == DEL_KEY || c == CONTROL_KEY('h') || c == BACKSPACE {
+			if len(buf) != 0 {
+				buf = buf[:len(buf)-1]
+			}
+		} else if c == '\x1b' {
+			editorSetStatusMessage("")
+			buf = ""
+			return buf
+		} else if c == '\r' {
+			if len(buf) != 0 {
+				editorSetStatusMessage("")
+				return buf
+			}
+		} else if c < 128 {
+			buf += string(c)
+		}
 	}
 }
 
