@@ -31,6 +31,16 @@ const (
 	DEL_KEY
 )
 
+const (
+	NORMAL = 'N'
+	INSERT = 'I'
+
+	LEFT  = 104
+	DOWN  = 106
+	UP    = 107
+	RIGHT = 108
+)
+
 type erow struct {
 	size   int
 	chars  []byte
@@ -50,6 +60,7 @@ type EditorConfig struct {
 	statusmsg_time         time.Time
 	linenum_indent         int
 	dirty                  bool
+	mode                   byte
 }
 
 var (
@@ -98,7 +109,7 @@ func editorOpen(filename string) {
 
 func editorSave() {
 	if E.filename == "" {
-		E.filename = editorPrompt("save as: %s (ESC to cancel)")
+		E.filename = editorPrompt("save as: %s (ESC to cancel)", nil)
 		if E.filename == "" {
 			editorSetStatusMessage("save aborted")
 			return
@@ -125,6 +136,38 @@ func editorSave() {
 	}
 
 	editorSetStatusMessage("can't save! I/O error: %s", err)
+}
+
+func editorFindCallback(query []byte, key byte) {
+	if key == '\r' || key == '\x1b' {
+		return
+	}
+
+	for i := 0; i < E.numrows; i++ {
+		row := &E.row[i]
+		if strings.Contains(string(row.render), string(query)) {
+			E.cy = i
+			E.cx = editorRowRxToCx(row, strings.Index(string(row.render), string(query)))
+			E.rowoff = E.numrows
+			break
+		}
+	}
+}
+
+func editorFind() {
+	savedCx := E.cx
+	savedCy := E.cy
+	savedRowoff := E.rowoff
+	savedColoff := E.coloff
+
+	query := editorPrompt("enter a search query: %s", editorFindCallback)
+
+	if query == "" {
+		E.cx = savedCx
+		E.cy = savedCy
+		E.rowoff = savedRowoff
+		E.coloff = savedColoff
+	}
 }
 
 func editorRowToString() (string, int) {
@@ -192,6 +235,21 @@ func editorRowCxToRx(row *erow, cx int) int {
 		rx++
 	}
 	return rx
+}
+
+func editorRowRxToCx(row *erow, rx int) int {
+	curRx := 0
+	var cx int
+	for cx = 0; cx < row.size; cx++ {
+		if row.chars[cx] == '\t' {
+			curRx += (TAB_STOP - 1) - (curRx % TAB_STOP)
+		}
+		curRx++
+		if curRx > rx {
+			return cx
+		}
+	}
+	return cx
 }
 
 func editorUpdateRow(row *erow) {
@@ -281,8 +339,8 @@ func editorDelChar() {
 	}
 }
 
-func editorPrompt(prompt string) string {
-	buf := ""
+func editorPrompt(prompt string, callback func([]byte, byte)) string {
+	var buf []byte
 
 	for {
 		editorSetStatusMessage(prompt, buf)
@@ -295,15 +353,24 @@ func editorPrompt(prompt string) string {
 			}
 		} else if c == '\x1b' {
 			editorSetStatusMessage("")
-			buf = ""
-			return buf
+			if callback != nil {
+				callback(buf, byte(c))
+			}
+			return ""
 		} else if c == '\r' {
 			if len(buf) != 0 {
 				editorSetStatusMessage("")
-				return buf
+				if callback != nil {
+					callback(buf, byte(c))
+				}
+				return string(buf)
 			}
 		} else if c < 128 {
-			buf += string(c)
+			buf = append(buf, byte(c))
+		}
+
+		if callback != nil {
+			callback(buf, byte(c))
 		}
 	}
 }
@@ -318,22 +385,22 @@ func editorMoveCursor(c int) {
 	}
 
 	switch c {
-	case ARROW_UP:
+	case ARROW_UP, UP:
 		if E.cy != 0 {
 			E.cy--
 		}
-	case ARROW_DOWN:
+	case ARROW_DOWN, DOWN:
 		if E.cy < E.numrows {
 			E.cy++
 		}
-	case ARROW_LEFT:
+	case ARROW_LEFT, LEFT:
 		if E.cx != 0 {
 			E.cx--
 		} else if E.cy > 0 {
 			E.cy--
 			E.cx = E.row[E.cy].size
 		}
-	case ARROW_RIGHT:
+	case ARROW_RIGHT, RIGHT:
 		if row != nil && E.cx < row.size {
 			E.cx++
 		} else if row != nil && E.cx == row.size {
@@ -398,15 +465,58 @@ func editorReadKey() int {
 }
 
 var QUIT_TIMES int = 2
+var prevKey byte
 
 func editorProcessKeyPress() {
 	c := editorReadKey()
 
 	switch c {
 	case '\r':
-		editorInsertNewLine()
-		break
+		if E.mode == INSERT {
+			editorInsertNewLine()
+			break
+		}
 	case CONTROL_KEY('l'), '\x1b':
+		if E.mode == INSERT {
+			E.mode = NORMAL
+		}
+		break
+	case 'i':
+		if E.mode == NORMAL {
+			E.mode = INSERT
+			break
+		} else if E.mode == INSERT {
+			editorInsertChar(c)
+			prevKey = byte(c)
+			break
+		}
+	case 'a':
+		if E.mode == NORMAL {
+			E.mode = INSERT
+			if E.row[E.cy].size != E.cx {
+				E.cx++
+
+			}
+			break
+		} else if E.mode == INSERT {
+			editorInsertChar(c)
+			prevKey = byte(c)
+			break
+		}
+	case 'o':
+		if E.mode == NORMAL {
+			editorInsertRow(E.cy+1, []byte(""))
+			E.mode = INSERT
+			E.cy++
+			E.cx = 0
+			break
+		} else if E.mode == INSERT {
+			editorInsertChar(c)
+			prevKey = byte(c)
+			break
+		}
+	case CONTROL_KEY('f'):
+		editorFind()
 		break
 	case CONTROL_KEY('q'):
 		if E.dirty && QUIT_TIMES > 0 {
@@ -434,15 +544,34 @@ func editorProcessKeyPress() {
 	case ARROW_UP, ARROW_DOWN, ARROW_LEFT, ARROW_RIGHT:
 		editorMoveCursor(c)
 		break
-	case BACKSPACE, CONTROL_KEY('h'), DEL_KEY:
-		if c == DEL_KEY {
-			editorMoveCursor(ARROW_RIGHT)
+	case 'h', 'j', 'k', 'l':
+		if E.mode == NORMAL {
+			editorMoveCursor(c)
+			break
+		} else if E.mode == INSERT {
+			if prevKey == 'j' && c == 'k' {
+				editorDelChar()
+				E.mode = NORMAL
+				break
+			} else {
+				editorInsertChar(c)
+				prevKey = byte(c)
+			}
 		}
-		editorDelChar()
-		break
+	case BACKSPACE, CONTROL_KEY('h'), DEL_KEY:
+		if E.mode == INSERT {
+			if c == DEL_KEY {
+				editorMoveCursor(ARROW_RIGHT)
+			}
+			editorDelChar()
+			break
+		}
 	default:
-		editorInsertChar(c)
-		break
+		if E.mode == INSERT {
+			editorInsertChar(c)
+			prevKey = byte(c)
+			break
+		}
 	}
 
 	QUIT_TIMES = 2
@@ -524,12 +653,12 @@ func editorDrawStatusBar(abuf *bytes.Buffer) {
 	length := ""
 	if E.filename != "" {
 		if E.dirty {
-			length = fmt.Sprintf("%.20s[+] - %d lines", E.filename, E.numrows)
+			length = fmt.Sprintf("--%s-- %.20s[+] - %d lines", string(E.mode), E.filename, E.numrows)
 		} else {
-			length = fmt.Sprintf("%.20s - %d lines", E.filename, E.numrows)
+			length = fmt.Sprintf("--%s-- %.20s - %d lines", string(E.mode), E.filename, E.numrows)
 		}
 	} else {
-		length = fmt.Sprintf("%.20s - %d lines", "[No Name]", E.numrows)
+		length = fmt.Sprintf("--%s-- %.20s - %d lines", string(E.mode), "[No Name]", E.numrows)
 	}
 	rlength := fmt.Sprintf("%d/%d", E.cy+1, E.numrows)
 	if len(length) > E.raw_screencols {
@@ -650,6 +779,7 @@ func initEditor() {
 	E.filename = ""
 	E.linenum_indent = 6
 	E.dirty = false
+	E.mode = NORMAL
 
 	E.screenrows -= 2
 }
@@ -661,7 +791,7 @@ func main() {
 		editorOpen(os.Args[1])
 	}
 
-	editorSetStatusMessage("Help: CTRL-S = save | CTRL-Q = quit")
+	editorSetStatusMessage("Help: CTRL-S = save | CTRL-Q = quit | CTRL-F = find")
 
 	for {
 		editorRefreshScreen()
