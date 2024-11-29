@@ -515,6 +515,15 @@ func editorProcessKeyPress() {
 			prevKey = byte(c)
 			break
 		}
+	case '/':
+		if E.mode == NORMAL {
+			editorFind()
+			break
+		} else if E.mode == INSERT {
+			editorInsertChar(c)
+			prevKey = byte(c)
+			break
+		}
 	case CONTROL_KEY('f'):
 		editorFind()
 		break
@@ -653,14 +662,14 @@ func editorDrawStatusBar(abuf *bytes.Buffer) {
 	length := ""
 	if E.filename != "" {
 		if E.dirty {
-			length = fmt.Sprintf("--%s-- %.20s[+] - %d lines", string(E.mode), E.filename, E.numrows)
+			length = fmt.Sprintf(" %s   %.20s[+]", string(E.mode), E.filename, E.numrows)
 		} else {
-			length = fmt.Sprintf("--%s-- %.20s - %d lines", string(E.mode), E.filename, E.numrows)
+			length = fmt.Sprintf(" %s   %.20s", string(E.mode), E.filename, E.numrows)
 		}
 	} else {
-		length = fmt.Sprintf("--%s-- %.20s - %d lines", string(E.mode), "[No Name]", E.numrows)
+		length = fmt.Sprintf(" %s   %.20s", string(E.mode), "[No Name]", E.numrows)
 	}
-	rlength := fmt.Sprintf("%d/%d", E.cy+1, E.numrows)
+	rlength := fmt.Sprintf("%d/%d ", E.cy+1, E.numrows)
 	if len(length) > E.raw_screencols {
 		length = length[:E.raw_screencols]
 	}
