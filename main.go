@@ -61,7 +61,7 @@ type EditorConfig struct {
 	linenum_indent         int
 	dirty                  bool
 	mode                   byte
-	cursor_memory          int
+	cxm                    int
 }
 
 var (
@@ -294,8 +294,8 @@ func editorInsertRow(at int, line []byte) {
 	} else {
 		E.row = append(E.row[:at], append(append(make([]erow, 0), row), E.row[at:]...)...)
 	}
-
 	editorUpdateRow(&E.row[at])
+
 	E.numrows++
 	E.dirty = true
 }
@@ -397,17 +397,20 @@ func editorMoveCursor(c int) {
 	case ARROW_LEFT, LEFT:
 		if E.cx != 0 {
 			E.cx--
+			// E.cxm = E.cx
 		} else if E.cy > 0 {
 			E.cy--
 			E.cx = E.row[E.cy].size
-			// might need to add cursor_memory here
+			// E.cxm = E.cx
 		}
 	case ARROW_RIGHT, RIGHT:
 		if row != nil && E.cx < row.size {
 			E.cx++
+			// E.cxm = E.cx
 		} else if row != nil && E.cx == row.size {
 			E.cy++
 			E.cx = 0
+			// E.cxm = E.cx
 		}
 	}
 
@@ -416,13 +419,13 @@ func editorMoveCursor(c int) {
 	} else {
 		row = &E.row[E.cy]
 	}
-	var rowlen int = 0
-	if row != nil {
-		rowlen = row.size
+
+	if E.cx > row.size {
+		E.cx = row.size
 	}
-	if E.cx > rowlen {
-		E.cx = rowlen
-	}
+	//  else if E.cx < row.size {
+	// 	E.cx = E.cxm
+	// }
 }
 
 func editorReadKey() int {
@@ -747,7 +750,7 @@ func editorRefreshScreen() {
 	editorDrawMessageBar(&abuf)
 
 	// abuf.WriteString("\x1b[H")
-	abuf.WriteString(fmt.Sprintf("\x1b[%d;%dH", E.cy-E.rowoff+1, E.cursor_memory-E.coloff+1+E.linenum_indent)) // I can augment how much I add to the cursor position, pushing it off that much - the key to line numbers
+	abuf.WriteString(fmt.Sprintf("\x1b[%d;%dH", E.cy-E.rowoff+1, E.rx-E.coloff+1+E.linenum_indent)) // I can augment how much I add to the cursor position, pushing it off that much - the key to line numbers
 	// in the above line, rx was replaced with cursor_memory
 
 	abuf.WriteString("\x1b[?25h")
@@ -775,7 +778,7 @@ func initEditor() {
 	E.linenum_indent = 6
 	E.dirty = false
 	E.mode = NORMAL
-	E.cursor_memory = 0
+	E.cxm = 0
 
 	E.screenrows -= 2
 }
